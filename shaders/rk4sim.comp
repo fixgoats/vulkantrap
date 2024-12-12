@@ -1,0 +1,58 @@
+#version 440
+
+const float PI = 3.14159265359; // Universal constants
+const float hbar = 6.582119569e-1;
+const float invhbar = 1 / hbar;
+const float muB = 5.7883818060e-2;
+layout(constant_id = 0) const uint NELEMENTSX = 2; // spec constants set to
+// ridiculous values to
+// ensure they are
+// overwritten in main
+layout(constant_id = 1) const uint NELEMENTSY = 2;
+layout(constant_id = 2) const uint NELEMENTSZ = 2;
+layout(constant_id = 3) const uint XGROUPSIZE = 1;
+layout(constant_id = 4) const uint YGROUPSIZE = 1;
+layout(local_size_x_id = 3, local_size_y_id = 4, local_size_z = 1) in;
+const float dt = 0.01;
+
+const vec2 I = vec2(0, 1);
+
+layout(std430, set = 0, binding = 0) buffer system {
+  vec4 data[NELEMENTSX * NELEMENTSY];
+};
+
+vec2 cmul(vec2 a, vec2 b) {
+  return vec2((a.x * b.x) - (a.y * b.y), (a.x * b.y) + (a.y * b.x));
+}
+
+vec4 cmul(vec2 a, vec4 b) { return vec4(cmul(a, b.xy), cmul(a, b.zw)); }
+
+vec4 cmul(vec4 a, vec4 b) { return vec4(cmul(a.xy, b.xy), cmul(a.zw, b.zw)); }
+
+vec2 conj(vec2 v) { return vec2(v.x, -v.y); }
+
+vec2 cinv(vec2 v) { return vec2(conj(v) / dot(v, v)); }
+
+vec4 f(vec4 y, float p, float r) {
+  vec4 factor = vec4(p - r * (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)), -1,
+                     p - r * (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)), 0);
+  return cmul(y, factor) + y.zwxy;
+}
+
+vec4 RK4step(vec4 y, float p, float r) {
+  vec4 k1 = f(y, p, r);
+  vec4 k2 = f(y + (0.5 * dt) * k1, p, r);
+  vec4 k3 = f(y + (0.5 * dt) * k2, p, r);
+  vec4 k4 = f(y + dt * k3, p, r);
+  return y + dt * (1. / 6.) * (k1 + (2 * k2) + (2 * k3) + k4);
+}
+
+void main() {
+  uint i = gl_GlobalInvocationID.x;
+  uint j = gl_GlobalInvocationID.y;
+
+  vec4 tmp = data[j * NELEMENTSX + i];
+  float p = 5.0 + i * 0.05;
+  float r = 0.5 + j * 0.1;
+  data[j * NELEMENTSX + i] = RK4step(tmp, p, r);
+}
