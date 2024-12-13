@@ -1,7 +1,5 @@
 #pragma once
 #include "betterexc.h"
-#include "doublemat_generated.h"
-#include "floatmat_generated.h"
 #include "typedefs.hpp"
 #include "vkhelpers.hpp"
 #include <algorithm>
@@ -11,7 +9,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <flatbuffers/flatbuffer_builder.h>
 #include <fstream>
 #include <iostream>
 #include <numeric>
@@ -43,14 +40,6 @@ struct small_mat {
 
   constexpr uint32_t X() { return C; }
   constexpr uint32_t Y() { return R; }
-
-  void addToFB(flatbuffers::FlatBufferBuilder& builder) {
-    using namespace GPEsim;
-    if constexpr (std::is_same<T, float>::value or
-                  std::is_same<T, c32>::value) {
-      auto bleh = builder.CreateVector(bit_cast<float*>(buffer.data()), 10);
-    }
-  }
 };
 
 // For when you need a more flexible matrix.
@@ -86,21 +75,6 @@ struct mat {
   constexpr T* data() { return buffer.data(); }
   constexpr size_t size() { return buffer.size(); }
 
-  void addToFB(flatbuffers::FlatBufferBuilder& builder) {
-    using namespace GPEsim;
-    if constexpr (std::is_same_v<T, c32> or std::is_same_v<T, float>) {
-      auto fbbuffer = builder.CreateVector(bit_cast<float*>(buffer.data()),
-                                           buffer.size() * sizeof(T) / 4);
-      auto fbmat = CreateFloatMat(builder, dims[0], dims[1], fbbuffer);
-      builder.Finish(fbmat);
-    } else {
-      auto fbbuffer = builder.CreateVector(bit_cast<double*>(buffer.data()),
-                                           buffer.size() * sizeof(T) / 8);
-      auto fbmat = CreateFloatMat(builder, dims[0], dims[1], fbbuffer);
-      builder.Finish(fbmat);
-    }
-  }
-
   void savetxt(std::string fname) {
     std::ofstream file(fname, std::ios::binary);
     if (!file.is_open()) {
@@ -125,37 +99,6 @@ struct mat {
     memcpy(buffer.data(), buf.data() + 8, buf.size() - 8);
   }
 };
-
-template <class T>
-mat<T> fbToMat(const GPEsim::FloatMat* fmat) {
-  uint32_t c = fmat->cols();
-  uint32_t r = fmat->rows();
-  const auto buf = fmat->data()->data();
-  if constexpr (std::is_same_v<T, c32>) {
-    mat<c32> matrix(c, r);
-    memcpy(matrix.data(), buf, c * r * 8);
-    return matrix;
-  } else if constexpr (std::is_same_v<T, float>) {
-    mat<float> matrix(fmat->cols(), fmat->rows());
-    memcpy(matrix.data(), buf, c * r * 4);
-    return matrix;
-  }
-}
-
-template <class T>
-mat<T> fbToMat(const GPEsim::DoubleMat* dmat) {
-  const auto c = dmat->cols();
-  const auto r = dmat->rows();
-  const auto buf = dmat->data()->data();
-  if constexpr (std::is_same_v<T, c64>) {
-    mat<c64> matrix(c, r);
-    memcpy(matrix.data(), buf, c * r * 16);
-    return matrix;
-  }
-  mat<double> matrix(c, r);
-  memcpy(matrix.data(), buf, c * r * 8);
-  return matrix;
-}
 
 template <class T, uint32_t S, uint32_t C, uint32_t R>
 struct small_arr3 {

@@ -30,7 +30,6 @@
 #include <string>
 
 #include "GPEsim.hpp"
-#include "floatmat_generated.h"
 #include "mathhelpers.hpp"
 #include "vkhelpers.hpp"
 #include <toml++/toml.hpp>
