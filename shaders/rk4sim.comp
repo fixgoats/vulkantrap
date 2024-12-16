@@ -17,7 +17,7 @@ layout(constant_id = 5) const float xstart = 100000.;
 layout(constant_id = 6) const float xend = 100000.1;
 layout(constant_id = 7) const float estart = -1000.0;
 layout(constant_id = 8) const float eend = 1000.0;
-const float dt = 0.001;
+const float dt = 0.01;
 
 const vec2 I = vec2(0, 1);
 
@@ -38,11 +38,11 @@ vec2 conj(vec2 v) { return vec2(v.x, -v.y); }
 vec2 cinv(vec2 v) { return vec2(conj(v) / dot(v, v)); }
 
 vec4 f(vec4 y, float x, float e) {
-  vec4 factor = vec4(1 - (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
-                     -x * (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
-                     1 - (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)),
-                     -x * (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)));
-  return cmul(y, factor) + y.zwxy;
+  vec4 factor = vec4(x - (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
+                     -0.01 * (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
+                     x - (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)),
+                     -0.01 * (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)));
+  return cmul(y, factor) + cmul(vec2(0, -e), y.zwxy);
 }
 
 vec4 RK4step(vec4 y, float x, float e) {

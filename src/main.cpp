@@ -52,7 +52,7 @@ SimConstants coupledConfig(const toml::table& tbl) {
   return {tbl["nElementsX"].value_or(256u), tbl["nElementsY"].value_or(256u),
           tbl["times"].value_or(256u),      tbl["xGroupSize"].value_or(8u),
           tbl["yGroupSize"].value_or(8u),   tbl["xstart"].value_or(0.0f),
-          tbl["xstart"].value_or(0.0f),     tbl["estart"].value_or(0.0f),
+          tbl["xend"].value_or(0.0f),       tbl["estart"].value_or(0.0f),
           tbl["eend"].value_or(0.0f)};
 }
 

@@ -1,0 +1,35 @@
+#version 440
+
+layout(constant_id = 0) const uint NELEMENTSX = 2; // spec constants set to
+// ridiculous values to
+// ensure they are
+// overwritten in main
+layout(constant_id = 1) const uint NELEMENTSY = 2;
+layout(constant_id = 2) const uint NELEMENTSZ = 2;
+layout(constant_id = 3) const uint XGROUPSIZE = 1;
+layout(constant_id = 4) const uint YGROUPSIZE = 1;
+layout(local_size_x_id = 3, local_size_y_id = 4, local_size_z = 1) in;
+layout(constant_id = 5) const float xstart = 100000.;
+layout(constant_id = 6) const float xend = 100000.1;
+layout(constant_id = 7) const float estart = -1000.0;
+layout(constant_id = 8) const float eend = 1000.0;
+const float dt = 0.01;
+
+layout(std430, set = 0, binding = 0) buffer system {
+  vec4 data[NELEMENTSX * NELEMENTSY];
+};
+
+layout(std430, set = 0, binding = 1) buffer stokes {
+  float s3[NELEMENTSX * NELEMENTSY];
+};
+
+float S3(vec4 v) {
+  return ((v[0] * v[0]) + (v[1] * v[1])) - ((v[2] * v[2]) + (v[3] * v[3]));
+}
+
+void main() {
+  uint i = gl_GlobalInvocationID.x;
+  uint j = gl_GlobalInvocationID.y;
+
+  s3[j * NELEMENTSX + i] = S3(data[j * NELEMENTSX + i]);
+}

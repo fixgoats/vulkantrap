@@ -40,7 +40,7 @@ vec4 f(vec4 y, float x) {
                      -x * (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
                      1 - (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)),
                      -x * (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)));
-  return cmul(y, factor) + y.zwxy;
+  return cmul(y, factor);
 }
 
 vec4 RK4step(vec4 y, float x) {

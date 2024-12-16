@@ -2,6 +2,7 @@
 #include <filesystem>
 
 static const std::string appName{"Vulkan GPE Simulator"};
+
 VulkanApp::VulkanApp(SimConstants sc) : params{sc} {
   vk::ApplicationInfo appInfo{appName.c_str(), 1, nullptr, 0,
                               VK_API_VERSION_1_3};
@@ -48,10 +49,20 @@ VulkanApp::VulkanApp(SimConstants sc) : params{sc} {
                                  vk::SharingMode::eExclusive,
                                  1,
                                  &computeQueueFamilyIndex};
+  vk::BufferCreateInfo complexBCI{vk::BufferCreateFlags(),
+                                  nElements * sizeof(c32),
+                                  vk::BufferUsageFlagBits::eStorageBuffer |
+                                      vk::BufferUsageFlagBits::eTransferDst |
+                                      vk::BufferUsageFlagBits::eTransferSrc,
+                                  vk::SharingMode::eExclusive,
+                                  1,
+                                  &computeQueueFamilyIndex};
   allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
   allocCreateInfo.priority = 1.0f;
   computeBuffers.emplace_back(allocator, allocCreateInfo, systemBCI);
-  std::vector<std::string> moduleNames = {"rk4sim.spv", "simplermodel.spv"};
+  computeBuffers.emplace_back(allocator, allocCreateInfo, complexBCI);
+  std::vector<std::string> moduleNames = {"rk4sim.spv", "simplermodel.spv",
+                                          "s3.spv"};
   setupPipelines(moduleNames);
 }
 
@@ -111,6 +122,28 @@ void VulkanApp::runSim(uint32_t n) {
 
   for (uint32_t i = 0; i < params.times; i++) {
     appendPipeline(commandBuffer, n);
+  }
+  commandBuffer.end();
+
+  vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &commandBuffer);
+  queue.submit(submitInfo, fence);
+  queue.waitIdle();
+  auto result = device.waitForFences(fence, vk::True, -1);
+  result = device.resetFences(1, &fence);
+}
+
+void VulkanApp::s3() {
+  auto commandBuffer =
+      device
+          .allocateCommandBuffers(
+              {commandPool, vk::CommandBufferLevel::ePrimary, 1})
+          .front();
+  vk::CommandBufferBeginInfo cBBI(
+      vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+  commandBuffer.begin(cBBI);
+
+  for (uint32_t i = 0; i < params.times; i++) {
+    appendPipeline(commandBuffer, 2);
   }
   commandBuffer.end();
 

@@ -7,7 +7,10 @@ import numpy as np
 from numba.core.config import os
 
 parser = ArgumentParser()
-parser.add_argument("-d", "--directory", help="directory where data files are stored")
+parser.add_argument("-d", "--directory", help="directory where data files are stored.")
+parser.add_argument(
+    "-f", "--format", help="The format to ouput with specified by file ending."
+)
 args = parser.parse_args()
 
 parts = args.directory.split("/")
@@ -39,57 +42,100 @@ def nsqr(v):
     return v.real * v.real + v.imag * v.imag
 
 
+Snorm = (
+    np.apply_along_axis(S1, 2, z).real ** 2
+    + np.apply_along_axis(S2, 2, z).real ** 2
+    + np.apply_along_axis(S3, 2, z).real ** 2
+)
+# Snorm = np.clip(Snorm, a_min=0.01, a_max=None)
+
 fig, ax = plt.subplots()
 im = ax.imshow(
-    np.apply_along_axis(S1, 2, z).real,
+    np.apply_along_axis(S1, 2, z).real ** 2 / Snorm,
+    extent=(conf["xstart"], conf["xend"], conf["eend"], conf["estart"]),
+    aspect="auto",
     interpolation="none",
 )
-ax.set_title(r"S1")
+ax.set_title(r"$S_1^2/|\vec{S}|^2$")
+ax.set_xlabel("p")
+ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
-fig.savefig(os.path.join(graphdir, "S1.pdf"))
+fig.savefig(os.path.join(graphdir, f"S1.{args.format}"))
 fig.clear()
 ax.clear()
 
 fig, ax = plt.subplots()
 im = ax.imshow(
-    np.apply_along_axis(S2, 2, z).real,
+    np.apply_along_axis(S2, 2, z).real ** 2 / Snorm,
+    extent=(conf["xstart"], conf["xend"], conf["eend"], conf["estart"]),
+    aspect="auto",
     interpolation="none",
 )
-ax.set_title(r"S2")
+ax.set_title(r"$S_2^2/|\vec{S}|^2$")
+ax.set_xlabel("p")
+ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
-fig.savefig(os.path.join(graphdir, "S2.pdf"))
+fig.savefig(os.path.join(graphdir, f"S2.{args.format}"))
 fig.clear()
 ax.clear()
 
 fig, ax = plt.subplots()
 im = ax.imshow(
-    np.apply_along_axis(S3, 2, z).real,
+    np.apply_along_axis(S3, 2, z).real ** 2 / Snorm,
+    extent=(conf["xstart"], conf["xend"], conf["eend"], conf["estart"]),
+    aspect="auto",
     interpolation="none",
 )
-ax.set_title(r"S3")
+ax.set_title(r"$S_3^2/|\vec{S}|^2$")
+ax.set_xlabel("p")
+ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
-fig.savefig(os.path.join(graphdir, "S3.pdf"))
+fig.savefig(os.path.join(graphdir, f"S3.{args.format}"))
 fig.clear()
 ax.clear()
 
 fig, ax = plt.subplots()
 im = ax.imshow(
     nsqr(a),
+    extent=(conf["xstart"], conf["xend"], conf["eend"], conf["estart"]),
+    aspect="auto",
     interpolation="none",
 )
 ax.set_title(r"$|\psi_+|$")
+ax.set_xlabel("p")
+ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
-minv = np.min(nsqr(a))
-maxv = np.max(nsqr(a))
-fig.savefig(os.path.join(graphdir, "psip.png"))
+fig.savefig(os.path.join(graphdir, f"psip.{args.format}"))
+fig.clear()
+ax.clear()
 
 fig, ax = plt.subplots()
 im = ax.imshow(
     nsqr(b),
+    extent=(conf["xstart"], conf["xend"], conf["eend"], conf["estart"]),
+    aspect="auto",
     interpolation="none",
 )
 ax.set_title(r"$|\psi_-|$")
+ax.set_xlabel("p")
+ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
-minv = np.min(nsqr(b))
-maxv = np.max(nsqr(b))
-fig.savefig(os.path.join(graphdir, "psim.png"))
+fig.savefig(os.path.join(graphdir, f"psim.{args.format}"))
+fig.clear()
+ax.clear()
+
+
+fig, ax = plt.subplots()
+im = ax.imshow(
+    nsqr(a) + nsqr(b),
+    extent=(conf["xstart"], conf["xend"], conf["eend"], conf["estart"]),
+    aspect="auto",
+    interpolation="none",
+)
+ax.set_title(r"$|\psi|$")
+ax.set_xlabel("p")
+ax.set_ylabel(r"$\epsilon$")
+cb = plt.colorbar(im)
+fig.savefig(os.path.join(graphdir, f"psi.{args.format}"))
+fig.clear()
+ax.clear()
