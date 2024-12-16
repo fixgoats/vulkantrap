@@ -5,3 +5,4 @@
 #flatc -o include/ --cpp doublearr3.fbs
 cmake --build build --parallel $(nproc)
 glslangValidator -V shaders/rk4sim.comp -o build/rk4sim.spv
+glslangValidator -V shaders/simplermodel.comp -o build/simplermodel.spv

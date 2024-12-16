@@ -15,9 +15,7 @@ layout(constant_id = 4) const uint YGROUPSIZE = 1;
 layout(local_size_x_id = 3, local_size_y_id = 4, local_size_z = 1) in;
 layout(constant_id = 5) const float xstart = 100000.;
 layout(constant_id = 6) const float xend = 100000.1;
-layout(constant_id = 7) const float estart = -1000.0;
-layout(constant_id = 8) const float eend = 1000.0;
-const float dt = 0.001;
+const float dt = 0.01;
 
 const vec2 I = vec2(0, 1);
 
@@ -37,7 +35,7 @@ vec2 conj(vec2 v) { return vec2(v.x, -v.y); }
 
 vec2 cinv(vec2 v) { return vec2(conj(v) / dot(v, v)); }
 
-vec4 f(vec4 y, float x, float e) {
+vec4 f(vec4 y, float x) {
   vec4 factor = vec4(1 - (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
                      -x * (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
                      1 - (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)),
@@ -45,22 +43,19 @@ vec4 f(vec4 y, float x, float e) {
   return cmul(y, factor) + y.zwxy;
 }
 
-vec4 RK4step(vec4 y, float x, float e) {
-  vec4 k1 = f(y, x, e);
-  vec4 k2 = f(y + (0.5 * dt) * k1, x, e);
-  vec4 k3 = f(y + (0.5 * dt) * k2, x, e);
-  vec4 k4 = f(y + dt * k3, x, e);
+vec4 RK4step(vec4 y, float x) {
+  vec4 k1 = f(y, x);
+  vec4 k2 = f(y + (0.5 * dt) * k1, x);
+  vec4 k3 = f(y + (0.5 * dt) * k2, x);
+  vec4 k4 = f(y + dt * k3, x);
   return y + dt * (1. / 6.) * (k1 + (2 * k2) + (2 * k3) + k4);
 }
 
 void main() {
   uint i = gl_GlobalInvocationID.x;
-  uint j = gl_GlobalInvocationID.y;
 
-  vec4 tmp = data[j * NELEMENTSX + i];
+  vec4 tmp = data[i];
   float dx = (xend - xstart) / float(NELEMENTSX);
-  float de = (eend - estart) / float(NELEMENTSY);
   float x = xstart + i * dx;
-  float e = estart + j * de;
-  data[j * NELEMENTSX + i] = RK4step(tmp, x, e);
+  data[i] = RK4step(tmp, x);
 }

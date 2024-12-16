@@ -51,7 +51,7 @@ VulkanApp::VulkanApp(SimConstants sc) : params{sc} {
   allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
   allocCreateInfo.priority = 1.0f;
   computeBuffers.emplace_back(allocator, allocCreateInfo, systemBCI);
-  std::vector<std::string> moduleNames = {"rk4sim.spv"};
+  std::vector<std::string> moduleNames = {"rk4sim.spv", "simplermodel.spv"};
   setupPipelines(moduleNames);
 }
 
@@ -99,7 +99,7 @@ void VulkanApp::copyInBatches(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   result = device.resetFences(1, &fence);
 }
 
-void VulkanApp::runSim() {
+void VulkanApp::runSim(uint32_t n) {
   auto commandBuffer =
       device
           .allocateCommandBuffers(
@@ -110,7 +110,7 @@ void VulkanApp::runSim() {
   commandBuffer.begin(cBBI);
 
   for (uint32_t i = 0; i < params.times; i++) {
-    appendPipeline(commandBuffer, 0);
+    appendPipeline(commandBuffer, n);
   }
   commandBuffer.end();
 
@@ -123,7 +123,7 @@ void VulkanApp::runSim() {
 
 void VulkanApp::initSystem() {
   std::mt19937 gen(rd());
-  std::uniform_real_distribution<float> dis(-0.1, 0.1);
+  std::uniform_real_distribution<float> dis(-0.01, 0.01);
   cvec2* sStagingPtr = bit_cast<cvec2*>(staging.aInfo.pMappedData);
   for (uint32_t j = 0; j < params.nElementsY; j++) {
     for (uint32_t i = 0; i < params.nElementsX; i++) {

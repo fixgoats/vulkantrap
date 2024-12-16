@@ -39,18 +39,6 @@
 
 using namespace std::complex_literals;
 
-void updateImage(cv::Mat& img, cv::Mat& out_img, VulkanApp& GPEsim) {
-  std::cout << "Running updateImage\n";
-  GPEsim.runSim();
-  auto Es = GPEsim.outputBuffer<float>(3);
-  auto max = *std::max_element(Es.begin(), Es.end());
-  std::cout << max << '\n';
-  auto maxinv = 1 / max;
-  std::transform(Es.begin(), Es.end(), img.begin<char>(),
-                 [&](float x) { return static_cast<char>(x * maxinv * 256); });
-  cv::applyColorMap(img, out_img, cv::COLORMAP_VIRIDIS);
-}
-
 std::string tstamp() {
   auto now = std::chrono::system_clock::now();
   std::time_t time = std::chrono::system_clock::to_time_t(now);
@@ -60,10 +48,18 @@ std::string tstamp() {
                      local_tm.tm_min);
 }
 
-SimConstants specConstsFromTbl(const toml::table& tbl) {
+SimConstants coupledConfig(const toml::table& tbl) {
   return {tbl["nElementsX"].value_or(256u), tbl["nElementsY"].value_or(256u),
-          tbl["times"].value_or(256u), tbl["xGroupSize"].value_or(8u),
-          tbl["yGroupSize"].value_or(8u)};
+          tbl["times"].value_or(256u),      tbl["xGroupSize"].value_or(8u),
+          tbl["yGroupSize"].value_or(8u),   tbl["xstart"].value_or(0.0f),
+          tbl["xstart"].value_or(0.0f),     tbl["estart"].value_or(0.0f),
+          tbl["eend"].value_or(0.0f)};
+}
+
+SimConstants simpleConfig(const toml::table& tbl) {
+  return {tbl["nElementsX"].value_or(256u), 1,  tbl["times"].value_or(100000u),
+          tbl["xGroupSize"].value_or(8u),   1,  tbl["xstart"].value_or(0.0f),
+          tbl["xend"].value_or(0.0f),       0., 0.};
 }
 
 int main(int argc, char* argv[]) {
@@ -72,22 +68,24 @@ int main(int argc, char* argv[]) {
   options.add_options()("c,config", "TOML config file",
                         cxxopts::value<std::string>())(
       "s,scan", "TOML config file", cxxopts::value<std::string>())(
-      "d,debug", "check system norm", cxxopts::value<std::string>());
+      "m,model", "Use simpler model", cxxopts::value<std::string>());
   auto result = options.parse(argc, argv);
   if (result.count("c")) {
-    auto start = std::chrono::high_resolution_clock::now();
     toml::table tbl{};
     auto infile = result["c"].as<std::string>();
     tbl = toml::parse_file(infile);
-    auto sc = specConstsFromTbl(*tbl["constants"].as_table());
+    auto sc = coupledConfig(*tbl["constants"].as_table());
 
     VulkanApp app{sc};
     std::cout << "Initialized GPE fine\n";
     app.initBuffers();
     std::cout << "Uploaded data\n";
-    cv::Mat img(sc.nElementsX, sc.nElementsY, CV_8UC1);
-    cv::Mat out_img(sc.nElementsX, sc.nElementsY, CV_8UC3);
-    app.runSim();
+    auto start = std::chrono::high_resolution_clock::now();
+    app.runSim(0);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << std::format("Simulation ran for: {} ms\n", elapsed.count());
     auto system = app.outputBuffer<cvec2>(0);
     std::ofstream values;
     auto dir = std::format("data/{}", tstamp());
@@ -111,6 +109,39 @@ int main(int argc, char* argv[]) {
       values << '\n';
     }
     values.close();
+    return 0;
+
+  } else if (result.count("m")) {
+    toml::table tbl{};
+    auto infile = result["m"].as<std::string>();
+    tbl = toml::parse_file(infile);
+    auto sc = simpleConfig(*tbl["simpler"].as_table());
+
+    VulkanApp app{sc};
+    std::cout << "Initialized GPE fine\n";
+    app.initBuffers();
+    std::cout << "Uploaded data\n";
+    auto start = std::chrono::high_resolution_clock::now();
+    auto dir = std::format("data/{}", tstamp());
+    std::filesystem::create_directories(dir);
+    std::filesystem::copy(infile, dir);
+    std::ofstream values;
+    std::ofstream othervalues;
+    values.open(std::format("{}/psi.csv", dir));
+    for (uint32_t i = 0; i < 1000; i++) {
+      app.runSim(1);
+      auto system = app.outputBuffer<cvec2>(0);
+      for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
+        values << std::format(" {}", numfmt(system[i].psip));
+        values << std::format(" {}", numfmt(system[i].psim));
+      }
+      values << '\n';
+    }
+    values.close();
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << std::format("Simulation ran for: {} ms\n", elapsed.count());
     return 0;
 
   } else {

@@ -38,7 +38,7 @@ struct VulkanApp {
   void copyInBatches(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
                      uint32_t batchSize, uint32_t numBatches);
 
-  void runSim();
+  void runSim(uint32_t n);
   void initSystem();
   void appendPipeline(vk::CommandBuffer& cB, uint32_t i);
   void initBuffers();

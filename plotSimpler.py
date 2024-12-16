@@ -15,12 +15,12 @@ graphdir = os.path.join("graphs", parts[-3], parts[-2])
 Path(graphdir).mkdir(parents=True, exist_ok=True)
 
 
-a = np.loadtxt(os.path.join(args.directory, "psip.csv"), dtype=complex)
-b = np.loadtxt(os.path.join(args.directory, "psim.csv"), dtype=complex)
+a = np.loadtxt(os.path.join(args.directory, "psi.csv"), dtype=complex)
+a = np.reshape(a, (1000, 256, 2))
 with open(os.path.join(args.directory, "simconf.toml"), "rb") as f:
     conf = tomllib.load(f)["constants"]
 
-z = np.dstack((a, b))
+print(a)
 
 
 def S1(v):
@@ -41,7 +41,7 @@ def nsqr(v):
 
 fig, ax = plt.subplots()
 im = ax.imshow(
-    np.apply_along_axis(S1, 2, z).real,
+    np.apply_along_axis(S1, 2, a).real,
     interpolation="none",
 )
 ax.set_title(r"S1")
@@ -52,7 +52,7 @@ ax.clear()
 
 fig, ax = plt.subplots()
 im = ax.imshow(
-    np.apply_along_axis(S2, 2, z).real,
+    np.apply_along_axis(S2, 2, a).real,
     interpolation="none",
 )
 ax.set_title(r"S2")
@@ -63,7 +63,7 @@ ax.clear()
 
 fig, ax = plt.subplots()
 im = ax.imshow(
-    np.apply_along_axis(S3, 2, z).real,
+    np.apply_along_axis(S3, 2, a).real,
     interpolation="none",
 )
 ax.set_title(r"S3")
@@ -74,22 +74,18 @@ ax.clear()
 
 fig, ax = plt.subplots()
 im = ax.imshow(
-    nsqr(a),
+    nsqr(a[:, :, 0]),
     interpolation="none",
 )
 ax.set_title(r"$|\psi_+|$")
 cb = plt.colorbar(im)
-minv = np.min(nsqr(a))
-maxv = np.max(nsqr(a))
 fig.savefig(os.path.join(graphdir, "psip.png"))
 
 fig, ax = plt.subplots()
 im = ax.imshow(
-    nsqr(b),
+    nsqr(a[:, :, 0]),
     interpolation="none",
 )
 ax.set_title(r"$|\psi_-|$")
 cb = plt.colorbar(im)
-minv = np.min(nsqr(b))
-maxv = np.max(nsqr(b))
 fig.savefig(os.path.join(graphdir, "psim.png"))

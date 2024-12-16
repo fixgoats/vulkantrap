@@ -50,6 +50,10 @@ struct SimConstants {
   uint32_t times;
   uint32_t xGroupSize;
   uint32_t yGroupSize;
+  float pstart;
+  float pend;
+  float rstart;
+  float rend;
   constexpr uint32_t X() const { return nElementsX / xGroupSize; }
   constexpr uint32_t Y() const { return nElementsY / yGroupSize; }
   constexpr bool validate() const {
