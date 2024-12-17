@@ -7,3 +7,4 @@ err.txt
 env/
 *.json
 *generated*
+graphs/

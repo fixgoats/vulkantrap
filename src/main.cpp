@@ -73,7 +73,9 @@ int main(int argc, char* argv[]) {
   if (result.count("c")) {
     toml::table tbl{};
     auto infile = result["c"].as<std::string>();
+    std::cout << "Got here\n";
     tbl = toml::parse_file(infile);
+    std::cout << "Got here\n";
     auto sc = coupledConfig(*tbl["constants"].as_table());
 
     VulkanApp app{sc};
@@ -115,33 +117,39 @@ int main(int argc, char* argv[]) {
     toml::table tbl{};
     auto infile = result["m"].as<std::string>();
     tbl = toml::parse_file(infile);
-    auto sc = simpleConfig(*tbl["simpler"].as_table());
+    auto sc = coupledConfig(*tbl["constants"].as_table());
 
     VulkanApp app{sc};
     std::cout << "Initialized GPE fine\n";
-    app.initBuffers();
-    std::cout << "Uploaded data\n";
     auto start = std::chrono::high_resolution_clock::now();
+    std::vector<double> avg(sc.nElementsX * sc.nElementsY, 0.);
+    for (uint32_t i = 0; i < 1; i++) {
+      app.initBuffers();
+      app.runSim(2);
+      app.s3();
+      auto s3 = app.outputBuffer<float>(1);
+      std::transform(s3.cbegin(), s3.cend(), avg.begin(), avg.begin(),
+                     [&](float a, double b) { return (double)a + b; });
+    }
+    /*std::transform(avg.begin(), avg.end(), avg.begin(),
+                   [](double x) { return x / 10.; });*/
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << std::format("Simulation ran for: {} ms\n", elapsed.count());
     auto dir = std::format("data/{}", tstamp());
     std::filesystem::create_directories(dir);
     std::filesystem::copy(infile, dir);
     std::ofstream values;
     std::ofstream othervalues;
-    values.open(std::format("{}/psi.csv", dir));
-    for (uint32_t i = 0; i < 1000; i++) {
-      app.runSim(1);
-      auto system = app.outputBuffer<cvec2>(0);
-      for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
-        values << std::format(" {}", numfmt(system[i].psip));
-        values << std::format(" {}", numfmt(system[i].psim));
+    values.open(std::format("{}/S3.csv", dir));
+    for (uint32_t j = 0; j < sc.nElementsY; j++) {
+      for (uint32_t i = 0; i < sc.nElementsX; i++) {
+        values << std::format(" {}", numfmt(avg[j * sc.nElementsX + i]));
       }
       values << '\n';
     }
     values.close();
-    auto end = std::chrono::high_resolution_clock::now();
-    auto elapsed =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << std::format("Simulation ran for: {} ms\n", elapsed.count());
     return 0;
 
   } else {

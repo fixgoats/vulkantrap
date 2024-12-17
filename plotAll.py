@@ -9,7 +9,10 @@ from numba.core.config import os
 parser = ArgumentParser()
 parser.add_argument("-d", "--directory", help="directory where data files are stored.")
 parser.add_argument(
-    "-f", "--format", help="The format to ouput with specified by file ending."
+    "-f",
+    "--format",
+    help="The format to ouput with specified by file ending.",
+    default="png",
 )
 args = parser.parse_args()
 

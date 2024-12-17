@@ -40,9 +40,9 @@ struct VulkanApp {
 
   void runSim(uint32_t n);
   void initSystem();
+  void s3();
   void appendPipeline(vk::CommandBuffer& cB, uint32_t i);
   void initBuffers();
-  void s3();
   uint32_t getComputeQueueFamilyIndex();
   void setupPipelines(std::vector<std::string> moduleNames);
   void rebuildPipelines(SimConstants p);

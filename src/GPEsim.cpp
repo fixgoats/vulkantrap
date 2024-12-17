@@ -49,18 +49,18 @@ VulkanApp::VulkanApp(SimConstants sc) : params{sc} {
                                  vk::SharingMode::eExclusive,
                                  1,
                                  &computeQueueFamilyIndex};
-  vk::BufferCreateInfo complexBCI{vk::BufferCreateFlags(),
-                                  nElements * sizeof(c32),
-                                  vk::BufferUsageFlagBits::eStorageBuffer |
-                                      vk::BufferUsageFlagBits::eTransferDst |
-                                      vk::BufferUsageFlagBits::eTransferSrc,
-                                  vk::SharingMode::eExclusive,
-                                  1,
-                                  &computeQueueFamilyIndex};
+  vk::BufferCreateInfo floatBCI{vk::BufferCreateFlags(),
+                                nElements * sizeof(float),
+                                vk::BufferUsageFlagBits::eStorageBuffer |
+                                    vk::BufferUsageFlagBits::eTransferDst |
+                                    vk::BufferUsageFlagBits::eTransferSrc,
+                                vk::SharingMode::eExclusive,
+                                1,
+                                &computeQueueFamilyIndex};
   allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
   allocCreateInfo.priority = 1.0f;
   computeBuffers.emplace_back(allocator, allocCreateInfo, systemBCI);
-  computeBuffers.emplace_back(allocator, allocCreateInfo, complexBCI);
+  computeBuffers.emplace_back(allocator, allocCreateInfo, floatBCI);
   std::vector<std::string> moduleNames = {"rk4sim.spv", "simplermodel.spv",
                                           "s3.spv"};
   setupPipelines(moduleNames);
@@ -142,9 +142,7 @@ void VulkanApp::s3() {
       vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
   commandBuffer.begin(cBBI);
 
-  for (uint32_t i = 0; i < params.times; i++) {
-    appendPipeline(commandBuffer, 2);
-  }
+  appendPipeline(commandBuffer, 2);
   commandBuffer.end();
 
   vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &commandBuffer);
