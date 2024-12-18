@@ -42,6 +42,7 @@ struct VulkanApp {
   void initSystem();
   void s3();
   void appendPipeline(vk::CommandBuffer& cB, uint32_t i);
+  void tests3();
   void initBuffers();
   uint32_t getComputeQueueFamilyIndex();
   void setupPipelines(std::vector<std::string> moduleNames);

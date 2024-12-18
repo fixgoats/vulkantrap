@@ -17,7 +17,7 @@ layout(constant_id = 5) const float xstart = 100000.;
 layout(constant_id = 6) const float xend = 100000.1;
 layout(constant_id = 7) const float estart = -1000.0;
 layout(constant_id = 8) const float eend = 1000.0;
-const float dt = 0.01;
+const float dt = 0.001;
 
 const vec2 I = vec2(0, 1);
 

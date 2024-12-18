@@ -25,10 +25,14 @@ print(a)
 fig, ax = plt.subplots()
 im = ax.imshow(
     a,
+    extent=(conf["xstart"], conf["xend"], conf["eend"], conf["estart"]),
+    aspect="auto",
     interpolation="none",
 )
 ax.set_title(r"S3")
+ax.set_xlabel("p")
+ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
-fig.savefig(os.path.join(graphdir, "S1.pdf"))
+fig.savefig(os.path.join(graphdir, "S3.pdf"))
 fig.clear()
 ax.clear()

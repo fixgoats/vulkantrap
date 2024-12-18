@@ -67,8 +67,8 @@ int main(int argc, char* argv[]) {
                            "Vulkan simulation of Gross-Pitaevskii equation");
   options.add_options()("c,config", "TOML config file",
                         cxxopts::value<std::string>())(
-      "s,scan", "TOML config file", cxxopts::value<std::string>())(
-      "m,model", "Use simpler model", cxxopts::value<std::string>());
+      "m,model", "Use simpler model", cxxopts::value<std::string>())(
+      "d,debug", "Test S3", cxxopts::value<std::string>());
   auto result = options.parse(argc, argv);
   if (result.count("c")) {
     toml::table tbl{};
@@ -92,7 +92,8 @@ int main(int argc, char* argv[]) {
     std::ofstream values;
     auto dir = std::format("data/{}", tstamp());
     std::filesystem::create_directories(dir);
-    std::filesystem::copy(infile, dir);
+    std::filesystem::copy(infile, dir,
+                          std::filesystem::copy_options::overwrite_existing);
     values.open(std::format("{}/psip.csv", dir));
     for (uint32_t j = 0; j < app.params.nElementsY; ++j) {
       for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
@@ -122,30 +123,65 @@ int main(int argc, char* argv[]) {
     VulkanApp app{sc};
     std::cout << "Initialized GPE fine\n";
     auto start = std::chrono::high_resolution_clock::now();
-    std::vector<double> avg(sc.nElementsX * sc.nElementsY, 0.);
-    for (uint32_t i = 0; i < 1; i++) {
+    std::vector<double> bleh(sc.elementsTotal(), 0);
+    std::cout << "allocated " << 8 * sc.elementsTotal() << " bytes\n";
+    std::vector<float> s3(sc.elementsTotal(), 0);
+    std::cout << "allocated " << 4 * sc.elementsTotal() << " bytes\n";
+    for (uint32_t i = 0; i < 10; i++) {
       app.initBuffers();
-      app.runSim(2);
+      app.runSim(0);
       app.s3();
-      auto s3 = app.outputBuffer<float>(1);
-      std::transform(s3.cbegin(), s3.cend(), avg.begin(), avg.begin(),
-                     [&](float a, double b) { return (double)a + b; });
+      s3 = app.outputBuffer<float>(1);
+      std::transform(s3.cbegin(), s3.cend(), bleh.begin(), bleh.begin(),
+                     [](float a, double b) { return (double)a + b; });
     }
-    /*std::transform(avg.begin(), avg.end(), avg.begin(),
-                   [](double x) { return x / 10.; });*/
+    std::transform(bleh.begin(), bleh.end(), bleh.begin(),
+                   [](double x) { return x / 10.; });
     auto end = std::chrono::high_resolution_clock::now();
     auto elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << std::format("Simulation ran for: {} ms\n", elapsed.count());
     auto dir = std::format("data/{}", tstamp());
     std::filesystem::create_directories(dir);
-    std::filesystem::copy(infile, dir);
+    std::filesystem::copy(infile, dir,
+                          std::filesystem::copy_options::overwrite_existing);
     std::ofstream values;
     std::ofstream othervalues;
     values.open(std::format("{}/S3.csv", dir));
     for (uint32_t j = 0; j < sc.nElementsY; j++) {
       for (uint32_t i = 0; i < sc.nElementsX; i++) {
-        values << std::format(" {}", numfmt(avg[j * sc.nElementsX + i]));
+        values << std::format(" {}", numfmt(s3[j * sc.nElementsX + i]));
+      }
+      values << '\n';
+    }
+    values.close();
+    return 0;
+
+  } else if (result.count("d")) {
+    toml::table tbl{};
+    auto infile = result["d"].as<std::string>();
+    tbl = toml::parse_file(infile);
+    auto sc = coupledConfig(*tbl["constants"].as_table());
+
+    VulkanApp app{sc};
+    std::cout << "Initialized GPE fine\n";
+    auto start = std::chrono::high_resolution_clock::now();
+    app.tests3();
+    auto s3 = app.outputBuffer<float>(1);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << std::format("Simulation ran for: {} ms\n", elapsed.count());
+    auto dir = std::format("data/{}", tstamp());
+    std::filesystem::create_directories(dir);
+    std::filesystem::copy(infile, dir,
+                          std::filesystem::copy_options::overwrite_existing);
+    std::ofstream values;
+    std::ofstream othervalues;
+    values.open(std::format("{}/S3.csv", dir));
+    for (uint32_t j = 0; j < sc.nElementsY; j++) {
+      for (uint32_t i = 0; i < sc.nElementsX; i++) {
+        values << std::format(" {}", numfmt(s3[j * sc.nElementsX + i]));
       }
       values << '\n';
     }
