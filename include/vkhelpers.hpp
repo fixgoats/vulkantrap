@@ -6,7 +6,6 @@
 #include <complex>
 #include <cstdint>
 #include <fstream>
-#include <vulkan/vulkan_raii.hpp>
 
 constexpr float hbar = 6.582119569e-1;
 constexpr float muB = 5.788e-2;

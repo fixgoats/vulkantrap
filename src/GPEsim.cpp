@@ -86,9 +86,9 @@ void VulkanApp::copyBuffers(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   queue.submit(submitInfo, fence);
   queue.waitIdle();
   auto result = device.waitForFences(fence, true, -1);
-  vk::resultCheck(result, "waitForFences unsuccesful");
+  vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::resultCheck(result, "resetFences unsuccesful");
+  vk::detail::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -113,9 +113,9 @@ void VulkanApp::copyInBatches(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   vk::SubmitInfo submitInfo(nullptr, nullptr, commandBuffer);
   queue.submit(submitInfo, fence);
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::resultCheck(result, "waitForFences unsuccesful");
+  vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::resultCheck(result, "resetFences unsuccesful");
+  vk::detail::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -138,9 +138,9 @@ void VulkanApp::runSim(uint32_t n) {
   queue.submit(submitInfo, fence);
   queue.waitIdle();
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::resultCheck(result, "waitForFences unsuccesful");
+  vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::resultCheck(result, "resetFences unsuccesful");
+  vk::detail::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -161,9 +161,9 @@ void VulkanApp::s3() {
   queue.submit(submitInfo, fence);
   queue.waitIdle();
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::resultCheck(result, "waitForFences unsuccesful");
+  vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::resultCheck(result, "resetFences unsuccesful");
+  vk::detail::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -192,9 +192,9 @@ void VulkanApp::tests3() {
   queue.submit(submitInfo, fence);
   queue.waitIdle();
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::resultCheck(result, "waitForFences unsuccesful");
+  vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::resultCheck(result, "resetFences unsuccesful");
+  vk::detail::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 

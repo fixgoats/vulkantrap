@@ -13,7 +13,6 @@
 #include <random>
 
 #include "typedefs.hpp"
-#include "vkFFT.h"
 #include <complex>
 #include <cxxopts.hpp>
 #include <stdexcept>
@@ -192,133 +191,80 @@ int main(int argc, char* argv[]) {
     tbl = toml::parse_file(infile);
     auto sc = coupledConfig(*tbl["constants"].as_table());
 
-    std::vector<float> xs(40);
-    std::vector<float> es(40);
-    std::vector<cvec2> psis(40);
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dis(-0.01, 0.01);
-    std::uniform_real_distribution<float> xdis(0.0, 1.0);
-    for (auto& x : psis) {
-      x = cvec2{{dis(gen), dis(gen)}, {dis(gen), dis(gen)}};
-    }
-    for (uint32_t i = 0; i < 40; i++) {
-      float tmpx = xdis(gen);
-      float tmpe = 0.2 * (tmpx + xdis(gen) * tmpx);
-      xs[i] = tmpx;
-      es[i] = tmpe;
-    }
     auto dir = std::format("data/{}", tstamp());
     std::filesystem::create_directories(dir);
     std::filesystem::copy(infile, dir,
                           std::filesystem::copy_options::overwrite_existing);
     std::ofstream values;
-    // std::ofstream othervalues;
-    // std::ofstream otherothervalues;
-    values.open(std::format("{}/S3.csv", dir));
-    // othervalues.open(std::format("{}/S2.csv", dir));
-    // otherothervalues.open(std::format("{}/S1.csv", dir));
-    for (uint32_t i = 0; i < sc.times / 1000; i++) {
-      for (size_t j = 0; j < 40; j++) {
-        for (uint32_t k = 0; k < 1000; k++) {
-          psis[j] = rk4(psis[j], 0.001f, xs[j], es[j]);
-        }
-        values << std::format(" {}", numfmt(S3(psis[j])));
-        // othervalues << std::format(" {}", numfmt(S2(psis[i])));
-        // otherothervalues << std::format(" {}", numfmt(S1(psis[i])));
-      }
-      values << '\n';
-      // othervalues << '\n';
-      // otherothervalues << '\n';
-    }
-    values.close();
-    // othervalues.close();
-    // otherothervalues.close();
-    return 0;
-
-  } else if (result.count("p")) {
-    toml::table tbl{};
-    auto infile = result["p"].as<std::string>();
-    tbl = toml::parse_file(infile);
-    auto sc = coupledConfig(*tbl["constants"].as_table());
-
-    const float x = 0.3;
-    const float e = 0.2;
-    std::vector<cvec2> psis(40);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<float> dis(-0.01, 0.01);
-    for (auto& r : psis) {
-      r = cvec2{{dis(gen), dis(gen)}, {dis(gen), dis(gen)}};
-    }
-    auto dir = std::format("data/{}", tstamp());
-    std::filesystem::create_directories(dir);
-    std::filesystem::copy(infile, dir,
-                          std::filesystem::copy_options::overwrite_existing);
-    std::ofstream values;
-    // std::ofstream othervalues;
-    // std::ofstream otherothervalues;
-    values.open(std::format("{}/S3.csv", dir));
-    // othervalues.open(std::format("{}/S2.csv", dir));
-    // otherothervalues.open(std::format("{}/S1.csv", dir));
-    for (uint32_t i = 0; i < sc.times / 1000; i++) {
-      for (size_t j = 0; j < 40; j++) {
-        for (uint32_t k = 0; k < 1000; k++) {
-          psis[j] = rk4(psis[j], 0.001f, x, e);
-        }
-        values << std::format(" {}", numfmt(S3(psis[j])));
-        // othervalues << std::format(" {}", numfmt(S2(psis[i])));
-        // otherothervalues << std::format(" {}", numfmt(S1(psis[i])));
+    {
+      std::vector<float> xs(40);
+      std::vector<float> es(40);
+      std::vector<cvec2> psis(40);
+      std::uniform_real_distribution<float> xdis(0.0, 1.0);
+      for (auto& x : psis) {
+        x = cvec2{{dis(gen), dis(gen)}, {dis(gen), dis(gen)}};
       }
-      values << '\n';
-      // othervalues << '\n';
-      // otherothervalues << '\n';
-    }
-    values.close();
-    // othervalues.close();
-    // otherothervalues.close();
-    return 0;
-
-  } else if (result.count("a")) {
-    toml::table tbl{};
-    auto infile = result["a"].as<std::string>();
-    tbl = toml::parse_file(infile);
-    auto sc = coupledConfig(*tbl["constants"].as_table());
-
-    const float x = 0.4;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dis(-0.01, 0.01);
-    std::vector<float> es(40);
-    std::vector<cvec2> psis(40, {{dis(gen), dis(gen)}, {dis(gen), dis(gen)}});
-    for (uint32_t i = 0; i < 40; i++) {
-      es[i] = 0.1 + (float)i * 0.01;
-    }
-    auto dir = std::format("data/{}", tstamp());
-    std::filesystem::create_directories(dir);
-    std::filesystem::copy(infile, dir,
-                          std::filesystem::copy_options::overwrite_existing);
-    std::ofstream values;
-    values.open(std::format("{}/S3.csv", dir));
-    for (uint32_t i = 0; i < sc.times / 1000; i++) {
-      for (size_t j = 0; j < 40; j++) {
-        for (uint32_t k = 0; k < 1000; k++) {
-          psis[j] = rk4(psis[j], 0.001f, x, es[j]);
-        }
-        values << std::format(" {}", numfmt(S3(psis[j])));
-        // othervalues << std::format(" {}", numfmt(S2(psis[i])));
-        // otherothervalues << std::format(" {}", numfmt(S1(psis[i])));
+      for (uint32_t i = 0; i < 40; i++) {
+        float tmpx = xdis(gen);
+        float tmpe = 0.2 * (tmpx + xdis(gen) * tmpx);
+        xs[i] = tmpx;
+        es[i] = tmpe;
       }
-      values << '\n';
-      // othervalues << '\n';
-      // otherothervalues << '\n';
+      values.open(std::format("{}/fullrandom.csv", dir));
+      for (uint32_t i = 0; i < sc.times / 100; i++) {
+        for (size_t j = 0; j < 40; j++) {
+          for (uint32_t k = 0; k < 100; k++) {
+            psis[j] = rk4(psis[j], 0.001f, xs[j], es[j]);
+          }
+          values << std::format(" {} {}", numfmt(psis[j].x), numfmt(psis[j].y));
+        }
+        values << '\n';
+      }
+      values.close();
     }
-    values.close();
-    // othervalues.close();
-    // otherothervalues.close();
-    return 0;
-
+    {
+      const float x = 0.3;
+      const float e = 0.2;
+      std::vector<cvec2> psis(40);
+      for (auto& r : psis) {
+        r = cvec2{{dis(gen), dis(gen)}, {dis(gen), dis(gen)}};
+      }
+      values.open(std::format("{}/randomic.csv", dir));
+      for (uint32_t i = 0; i < sc.times / 100; i++) {
+        for (size_t j = 0; j < 40; j++) {
+          for (uint32_t k = 0; k < 100; k++) {
+            psis[j] = rk4(psis[j], 0.001f, x, e);
+          }
+          values << std::format(" {} {}", numfmt(psis[j].x), numfmt(psis[j].y));
+        }
+        values << '\n';
+      }
+      values.close();
+    }
+    {
+      const float x = 0.4;
+      std::vector<float> es(40);
+      std::vector<cvec2> psis(40, {{dis(gen), dis(gen)}, {dis(gen), dis(gen)}});
+      for (uint32_t i = 0; i < 40; i++) {
+        es[i] = 0.1 + (float)i * 0.01;
+      }
+      values.open(std::format("{}/escan.csv", dir));
+      for (uint32_t i = 0; i < sc.times / 100; i++) {
+        for (size_t j = 0; j < 40; j++) {
+          for (uint32_t k = 0; k < 100; k++) {
+            psis[j] = rk4(psis[j], 0.001f, x, es[j]);
+          }
+          values << std::format(" {} {}", numfmt(psis[j].x), numfmt(psis[j].y));
+        }
+        values << '\n';
+      }
+      values.close();
+    }
   } else {
     throw std::runtime_error("gib c\n");
   }
+  return 0;
 }

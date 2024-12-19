@@ -1,6 +1,5 @@
 #pragma once
 #include "hack.hpp"
-#include "vkFFT.h"
 #include "vkhelpers.hpp"
 #include <bit>
 #include <cstdint>
