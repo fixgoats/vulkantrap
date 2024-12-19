@@ -365,8 +365,7 @@ void VulkanApp::writeAllToCsv(std::string conffile) {
   values.open(std::format("{}/psip.csv", dir));
   for (uint32_t j = 0; j < params.nElementsY; ++j) {
     for (uint32_t i = 0; i < params.nElementsX; ++i) {
-      values << std::format(" {}",
-                            numfmt(system[j * params.nElementsX + i].psip));
+      values << std::format(" {}", numfmt(system[j * params.nElementsX + i].x));
     }
     values << '\n';
   }
@@ -374,8 +373,7 @@ void VulkanApp::writeAllToCsv(std::string conffile) {
   values.open(std::format("{}/psim.csv", dir));
   for (uint32_t j = 0; j < params.nElementsY; ++j) {
     for (uint32_t i = 0; i < params.nElementsX; ++i) {
-      values << std::format(" {}",
-                            numfmt(system[j * params.nElementsX + i].psim));
+      values << std::format(" {}", numfmt(system[j * params.nElementsX + i].y));
     }
     values << '\n';
   }

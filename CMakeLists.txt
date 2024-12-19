@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(VulkanCompute)
-set(SOURCES src/main.cpp src/vkhelpers.cpp src/GPEsim.cpp)
+set(SOURCES src/main.cpp src/vkhelpers.cpp src/GPEsim.cpp src/rk4.cpp)
 add_executable(VulkanCompute ${SOURCES})
 set(TARGET_NAME VulkanCompute)
 target_include_directories(VulkanCompute PRIVATE include)
@@ -15,8 +15,13 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
 
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    message("Build type set to Release")
+endif()
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(DEBUG)
+    message("Build type set to Debug")
 endif()
 
 add_definitions(-DVKFFT_BACKEND=${VKFFT_BACKEND})

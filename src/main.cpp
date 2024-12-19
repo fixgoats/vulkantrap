@@ -1,39 +1,29 @@
 #include "hack.hpp"
 #include <algorithm>
-#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <ctime>
-#include <exception>
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <ios>
 #include <iostream>
-#include <opencv2/core/hal/interface.h>
-#include <opencv2/core/mat.hpp>
 #include <random>
 
 #include "typedefs.hpp"
 #include "vkFFT.h"
 #include <complex>
 #include <cxxopts.hpp>
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 
 #include "GPEsim.hpp"
 #include "mathhelpers.hpp"
+#include "rk4.h"
 #include "vkhelpers.hpp"
 #include <toml++/toml.hpp>
-#include <type_traits>
 
 #define PRINTVAR(x) std::cout << x << '\n'
 
@@ -68,7 +58,13 @@ int main(int argc, char* argv[]) {
   options.add_options()("c,config", "TOML config file",
                         cxxopts::value<std::string>())(
       "m,model", "Use simpler model", cxxopts::value<std::string>())(
-      "d,debug", "Test S3", cxxopts::value<std::string>());
+      "d,debug", "Test S3",
+      cxxopts::value<std::string>())("s,sample",
+                                     "Solve fewer systems on CPU, random "
+                                     "coefficients in possibly chaotic range",
+                                     cxxopts::value<std::string>())(
+      "p,pew", "Solve with fixed coefficients but random initial conditions",
+      cxxopts::value<std::string>());
   auto result = options.parse(argc, argv);
   if (result.count("c")) {
     toml::table tbl{};
@@ -97,8 +93,8 @@ int main(int argc, char* argv[]) {
     values.open(std::format("{}/psip.csv", dir));
     for (uint32_t j = 0; j < app.params.nElementsY; ++j) {
       for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
-        values << std::format(
-            " {}", numfmt(system[j * app.params.nElementsX + i].psip));
+        values << std::format(" {}",
+                              numfmt(system[j * app.params.nElementsX + i].x));
       }
       values << '\n';
     }
@@ -106,8 +102,8 @@ int main(int argc, char* argv[]) {
     values.open(std::format("{}/psim.csv", dir));
     for (uint32_t j = 0; j < app.params.nElementsY; ++j) {
       for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
-        values << std::format(
-            " {}", numfmt(system[j * app.params.nElementsX + i].psim));
+        values << std::format(" {}",
+                              numfmt(system[j * app.params.nElementsX + i].y));
       }
       values << '\n';
     }
@@ -186,6 +182,99 @@ int main(int argc, char* argv[]) {
       values << '\n';
     }
     values.close();
+    return 0;
+
+  } else if (result.count("s")) {
+    toml::table tbl{};
+    auto infile = result["s"].as<std::string>();
+    tbl = toml::parse_file(infile);
+    auto sc = coupledConfig(*tbl["constants"].as_table());
+
+    std::vector<float> xs(40);
+    std::vector<float> es(40);
+    std::vector<cvec2> psis(40);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dis(-0.01, 0.01);
+    std::uniform_real_distribution<float> xdis(0.0, 1.0);
+    for (auto& x : psis) {
+      x = cvec2{{dis(gen), dis(gen)}, {dis(gen), dis(gen)}};
+    }
+    for (uint32_t i = 0; i < 40; i++) {
+      float tmpx = xdis(gen);
+      float tmpe = 0.2 * (tmpx - xdis(gen) * tmpx);
+      xs[i] = tmpx;
+      es[i] = tmpe;
+    }
+    auto dir = std::format("data/{}", tstamp());
+    std::filesystem::create_directories(dir);
+    std::filesystem::copy(infile, dir,
+                          std::filesystem::copy_options::overwrite_existing);
+    std::ofstream values;
+    // std::ofstream othervalues;
+    // std::ofstream otherothervalues;
+    values.open(std::format("{}/S3.csv", dir));
+    // othervalues.open(std::format("{}/S2.csv", dir));
+    // otherothervalues.open(std::format("{}/S1.csv", dir));
+    for (uint32_t i = 0; i < sc.times / 1000; i++) {
+      for (size_t j = 0; j < 40; j++) {
+        for (uint32_t k = 0; k < 1000; k++) {
+          psis[j] = rk4(psis[j], 0.001f, xs[j], es[j]);
+        }
+        values << std::format(" {}", numfmt(S3(psis[j])));
+        // othervalues << std::format(" {}", numfmt(S2(psis[i])));
+        // otherothervalues << std::format(" {}", numfmt(S1(psis[i])));
+      }
+      values << '\n';
+      // othervalues << '\n';
+      // otherothervalues << '\n';
+    }
+    values.close();
+    // othervalues.close();
+    // otherothervalues.close();
+    return 0;
+
+  } else if (result.count("p")) {
+    toml::table tbl{};
+    auto infile = result["p"].as<std::string>();
+    tbl = toml::parse_file(infile);
+    auto sc = coupledConfig(*tbl["constants"].as_table());
+
+    const float x = 0.3;
+    const float e = 0.05;
+    std::vector<cvec2> psis(40);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dis(-0.01, 0.01);
+    for (auto& x : psis) {
+      x = cvec2{{dis(gen), dis(gen)}, {dis(gen), dis(gen)}};
+    }
+    auto dir = std::format("data/{}", tstamp());
+    std::filesystem::create_directories(dir);
+    std::filesystem::copy(infile, dir,
+                          std::filesystem::copy_options::overwrite_existing);
+    std::ofstream values;
+    // std::ofstream othervalues;
+    // std::ofstream otherothervalues;
+    values.open(std::format("{}/S3.csv", dir));
+    // othervalues.open(std::format("{}/S2.csv", dir));
+    // otherothervalues.open(std::format("{}/S1.csv", dir));
+    for (uint32_t i = 0; i < sc.times / 1000; i++) {
+      for (size_t j = 0; j < 40; j++) {
+        for (uint32_t k = 0; k < 1000; k++) {
+          psis[j] = rk4(psis[j], 0.001f, x, e);
+        }
+        values << std::format(" {}", numfmt(S3(psis[j])));
+        // othervalues << std::format(" {}", numfmt(S2(psis[i])));
+        // otherothervalues << std::format(" {}", numfmt(S1(psis[i])));
+      }
+      values << '\n';
+      // othervalues << '\n';
+      // otherothervalues << '\n';
+    }
+    values.close();
+    // othervalues.close();
+    // otherothervalues.close();
     return 0;
 
   } else {

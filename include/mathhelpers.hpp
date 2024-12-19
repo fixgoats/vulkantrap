@@ -6,6 +6,7 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <complex>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -22,6 +23,14 @@ constexpr uint32_t euclid_mod(T a, uint32_t b) {
   assert(b != 0);
   return a % b;
 }
+
+constexpr float S1(cvec2 x) {
+  return 2 * (x.x.real() * x.y.real() + x.x.imag() * x.y.imag());
+}
+constexpr float S2(cvec2 x) {
+  return 2 * (x.x.real() * x.y.imag() - x.x.imag() * x.y.real());
+}
+constexpr float S3(cvec2 x) { return std::norm(x.x) - std::norm(x.y); }
 
 template <class T, uint32_t C, uint32_t R>
 struct small_mat {

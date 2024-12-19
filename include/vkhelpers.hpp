@@ -1,14 +1,12 @@
 #pragma once
 #include "hack.hpp"
 #include "mathhelpers.hpp"
+#include "typedefs.hpp"
 #include "vk_mem_alloc.h"
 #include <complex>
 #include <cstdint>
 #include <fstream>
 #include <vulkan/vulkan_raii.hpp>
-
-typedef std::complex<double> c64;
-typedef std::complex<float> c32;
 
 constexpr float hbar = 6.582119569e-1;
 constexpr float muB = 5.788e-2;
@@ -65,11 +63,6 @@ constexpr uint32_t nSpecConsts = sizeof(SimConstants) / 4;
 
 std::ostream& operator<<(std::ostream& os, const SimConstants& obj);
 std::ofstream& operator<<(std::ofstream& os, const SimConstants& obj);
-
-struct cvec2 {
-  c32 psip;
-  c32 psim;
-};
 
 const vk::MemoryBarrier fullMemoryBarrier(vk::AccessFlagBits::eShaderRead |
                                               vk::AccessFlagBits::eMemoryWrite,

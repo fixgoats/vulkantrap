@@ -1,7 +1,10 @@
 [constants]
 nElementsX = 256
 nElementsY = 256
-times = 600000
+times = 3000000
 xGroupSize = 8
 yGroupSize = 8
-
+xstart = 0.0
+xend = 2.0
+estart = 0.0
+eend = 0.1
