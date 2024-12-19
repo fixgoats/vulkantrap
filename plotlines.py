@@ -26,7 +26,6 @@ fig, ax = plt.subplots()
 im = ax.plot(
     t,
     a,
-    color="k",
 )
 ax.set_title(r"S3")
 fig.savefig(os.path.join(graphdir, "S3.pdf"))
