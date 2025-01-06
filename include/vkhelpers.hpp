@@ -70,6 +70,7 @@ const vk::MemoryBarrier fullMemoryBarrier(vk::AccessFlagBits::eShaderRead |
 
 struct MetaBuffer {
   vk::Buffer buffer;
+  VmaAllocator* pallocator = nullptr;
   VmaAllocation allocation;
   VmaAllocationInfo aInfo;
   MetaBuffer();
@@ -79,7 +80,7 @@ struct MetaBuffer {
   void allocate(VmaAllocator& allocator,
                 VmaAllocationCreateInfo& allocCreateInfo,
                 vk::BufferCreateInfo& BCI);
-  void extirpate(VmaAllocator& allocator);
+  ~MetaBuffer();
 };
 
 std::vector<uint32_t> readFile(const std::string& filename);

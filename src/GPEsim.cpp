@@ -15,16 +15,16 @@ VulkanApp::VulkanApp(SimConstants sc) : params{sc} {
   vk::InstanceCreateInfo iCI(vk::InstanceCreateFlags(), &appInfo, layers, {});
   instance = vk::createInstance(iCI);
   pDevice = pickPhysicalDevice(instance);
-  uint32_t computeQueueFamilyIndex = getComputeQueueFamilyIndex();
+  cQFI = getComputeQueueFamilyIndex();
   float queuePriority = 1.0f;
-  vk::DeviceQueueCreateInfo dQCI(vk::DeviceQueueCreateFlags(),
-                                 computeQueueFamilyIndex, 1, &queuePriority);
+  vk::DeviceQueueCreateInfo dQCI(vk::DeviceQueueCreateFlags(), cQFI, 1,
+                                 &queuePriority);
   vk::DeviceCreateInfo dCI(vk::DeviceCreateFlags(), dQCI);
   device = pDevice.createDevice(dCI);
   vk::CommandPoolCreateInfo commandPoolCreateInfo(vk::CommandPoolCreateFlags(),
-                                                  computeQueueFamilyIndex);
+                                                  cQFI);
   commandPool = device.createCommandPool(commandPoolCreateInfo);
-  queue = device.getQueue(computeQueueFamilyIndex, 0);
+  queue = device.getQueue(cQFI, 0);
   fence = device.createFence(vk::FenceCreateInfo());
   VmaAllocatorCreateInfo allocatorInfo{};
   allocatorInfo.physicalDevice = pDevice;
@@ -42,28 +42,6 @@ VulkanApp::VulkanApp(SimConstants sc) : params{sc} {
       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
       VMA_ALLOCATION_CREATE_MAPPED_BIT;
   staging.allocate(allocator, allocCreateInfo, stagingBCI);
-  vk::BufferCreateInfo systemBCI{vk::BufferCreateFlags(),
-                                 nElements * sizeof(cvec2),
-                                 vk::BufferUsageFlagBits::eStorageBuffer |
-                                     vk::BufferUsageFlagBits::eTransferDst |
-                                     vk::BufferUsageFlagBits::eTransferSrc,
-                                 vk::SharingMode::eExclusive,
-                                 1,
-                                 &computeQueueFamilyIndex};
-  vk::BufferCreateInfo floatBCI{vk::BufferCreateFlags(),
-                                nElements * sizeof(float),
-                                vk::BufferUsageFlagBits::eStorageBuffer |
-                                    vk::BufferUsageFlagBits::eTransferDst |
-                                    vk::BufferUsageFlagBits::eTransferSrc,
-                                vk::SharingMode::eExclusive,
-                                1,
-                                &computeQueueFamilyIndex};
-  allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-  allocCreateInfo.priority = 1.0f;
-  computeBuffers.emplace_back(allocator, allocCreateInfo, systemBCI);
-  computeBuffers.emplace_back(allocator, allocCreateInfo, floatBCI);
-  computeBuffers.emplace_back(allocator, allocCreateInfo, floatBCI);
-  computeBuffers.emplace_back(allocator, allocCreateInfo, floatBCI);
   std::vector<std::string> moduleNames = {"rk4sim.spv", "simplermodel.spv",
                                           "s3.spv"};
   setupPipelines(moduleNames);
@@ -263,7 +241,7 @@ void VulkanApp::rebuildPipelines(SimConstants p) {
   }
 }
 
-void VulkanApp::setupPipelines(std::vector<std::string> moduleNames) {
+void VulkanApp::setupPipelines(const std::vector<std::string>& moduleNames) {
   for (const auto& name : moduleNames) {
     std::vector<uint32_t> shaderCode = readFile<uint32_t>(name);
     vk::ShaderModuleCreateInfo shaderMCI(vk::ShaderModuleCreateFlags(),
@@ -312,7 +290,7 @@ void VulkanApp::setupPipelines(std::vector<std::string> moduleNames) {
   descriptorPool = device.createDescriptorPool(dPCI);
   vk::DescriptorSetAllocateInfo dSAI(descriptorPool, 1, &dSL);
   descriptorSets = device.allocateDescriptorSets(dSAI);
-  descriptorSet = descriptorSets[0];
+  auto descriptorSet = descriptorSets[0];
   std::vector<vk::DescriptorBufferInfo> dBIs;
   for (const auto& b : computeBuffers) {
     dBIs.emplace_back(b.buffer, 0, b.aInfo.size);
@@ -342,10 +320,7 @@ VulkanApp::~VulkanApp() {
   }
   device.destroyPipelineLayout(pipelineLayout);
   device.destroyDescriptorSetLayout(dSL);
-  staging.extirpate(allocator);
-  for (auto& b : computeBuffers) {
-    b.extirpate(allocator);
-  }
+  staging.~MetaBuffer();
   vmaDestroyAllocator(allocator);
   device.destroyCommandPool(commandPool);
   device.destroy();

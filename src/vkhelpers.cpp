@@ -31,6 +31,7 @@ MetaBuffer::MetaBuffer(VmaAllocator& allocator,
   buffer = vk::Buffer{};
   allocation = VmaAllocation{};
   aInfo = VmaAllocationInfo{};
+  pallocator = &allocator;
   vmaCreateBuffer(allocator, reinterpret_cast<VkBufferCreateInfo*>(&BCI),
                   &allocCreateInfo, reinterpret_cast<VkBuffer*>(&buffer),
                   &allocation, &aInfo);
@@ -44,8 +45,8 @@ void MetaBuffer::allocate(VmaAllocator& allocator,
                   &allocation, &aInfo);
 }
 
-void MetaBuffer::extirpate(VmaAllocator& allocator) {
-  vmaDestroyBuffer(allocator, static_cast<VkBuffer>(buffer), allocation);
+MetaBuffer::~MetaBuffer() {
+  vmaDestroyBuffer(*pallocator, static_cast<VkBuffer>(buffer), allocation);
 }
 
 vk::PhysicalDevice pickPhysicalDevice(const vk::Instance& instance,

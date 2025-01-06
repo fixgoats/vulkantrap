@@ -15,8 +15,7 @@ struct VulkanApp {
   vk::Fence fence;
   VmaAllocator allocator;
   MetaBuffer staging;
-  uint32_t nComplexBuffers;
-  uint32_t nFloatBuffers;
+  uint32_t cQFI;
   SimConstants params;
   std::vector<MetaBuffer> computeBuffers;
   std::vector<vk::ShaderModule> modules;
@@ -25,7 +24,6 @@ struct VulkanApp {
   vk::PipelineCache pipelineCache;
   std::vector<vk::Pipeline> computePipelines;
   std::vector<vk::DescriptorSet> descriptorSets;
-  vk::DescriptorSet descriptorSet;
   vk::DescriptorPool descriptorPool;
   vk::CommandPool commandPool;
 
@@ -44,9 +42,27 @@ struct VulkanApp {
   void tests3();
   void initBuffers();
   uint32_t getComputeQueueFamilyIndex();
-  void setupPipelines(std::vector<std::string> moduleNames);
+  void setupPipelines(const std::vector<std::string>& moduleNames);
   void rebuildPipelines(SimConstants p);
   void writeAllToCsv(std::string conffile);
+
+  template <typename T>
+  MetaBuffer makeBuffer(uint32_t nElements) {
+    vk::BufferCreateInfo bCI{vk::BufferCreateFlags(),
+                             nElements * sizeof(T),
+                             vk::BufferUsageFlagBits::eStorageBuffer |
+                                 vk::BufferUsageFlagBits::eTransferDst |
+                                 vk::BufferUsageFlagBits::eTransferSrc,
+                             vk::SharingMode::eExclusive,
+                             1,
+                             &cQFI};
+    VmaAllocationCreateInfo allocCreateInfo{};
+    allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+    allocCreateInfo.priority = 1.0f;
+    return MetaBuffer{allocator, allocCreateInfo, bCI};
+  }
+
   template <typename T>
   std::vector<T> outputBuffer(uint32_t n) {
     T* sStagingPtr = bit_cast<T*>(staging.aInfo.pMappedData);
