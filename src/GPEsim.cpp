@@ -86,9 +86,9 @@ void VulkanApp::copyBuffers(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   queue.submit(submitInfo, fence);
   queue.waitIdle();
   auto result = device.waitForFences(fence, true, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
+  vk::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
+  vk::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -113,9 +113,48 @@ void VulkanApp::copyInBatches(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   vk::SubmitInfo submitInfo(nullptr, nullptr, commandBuffer);
   queue.submit(submitInfo, fence);
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
+  vk::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
+  vk::resultCheck(result, "resetFences unsuccesful");
+  device.freeCommandBuffers(commandPool, commandBuffer);
+}
+
+void VulkanApp::savg() {
+  auto commandBuffer =
+      device
+          .allocateCommandBuffers(
+              {commandPool, vk::CommandBufferLevel::ePrimary, 1})
+          .front();
+  vk::CommandBufferBeginInfo cBBI(
+      vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+  commandBuffer.begin(cBBI);
+
+  for (uint32_t i = 0; i < params.times / 2; i++) {
+    appendPipeline(commandBuffer, 0);
+  }
+  commandBuffer.end();
+
+  vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &commandBuffer);
+  queue.submit(submitInfo, fence);
+  queue.waitIdle();
+  auto result = device.waitForFences(fence, vk::True, -1);
+  vk::resultCheck(result, "waitForFences unsuccesful");
+  result = device.resetFences(1, &fence);
+  vk::resultCheck(result, "resetFences unsuccesful");
+  commandBuffer.reset();
+  commandBuffer.begin(cBBI);
+
+  for (uint32_t i = 0; i < params.times / 2; i++) {
+    appendPipeline(commandBuffer, 0);
+    appendPipeline(commandBuffer, 2);
+  }
+  commandBuffer.end();
+  queue.submit(submitInfo, fence);
+  queue.waitIdle();
+  result = device.waitForFences(fence, vk::True, -1);
+  vk::resultCheck(result, "waitForFences unsuccesful");
+  result = device.resetFences(1, &fence);
+  vk::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -138,9 +177,9 @@ void VulkanApp::runSim(uint32_t n) {
   queue.submit(submitInfo, fence);
   queue.waitIdle();
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
+  vk::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
+  vk::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -161,9 +200,9 @@ void VulkanApp::s3() {
   queue.submit(submitInfo, fence);
   queue.waitIdle();
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
+  vk::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
+  vk::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -192,9 +231,9 @@ void VulkanApp::tests3() {
   queue.submit(submitInfo, fence);
   queue.waitIdle();
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
+  vk::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
+  vk::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -222,7 +261,25 @@ void VulkanApp::appendPipeline(vk::CommandBuffer& cB, uint32_t i) {
   cB.dispatch(params.X(), params.Y(), 1);
 }
 
-void VulkanApp::initBuffers() { initSystem(); }
+void VulkanApp::initBuffers() {
+  initSystem();
+  zeroInitS();
+}
+
+void VulkanApp::zeroInitS() {
+  float* sStagingPtr = bit_cast<float*>(staging.aInfo.pMappedData);
+  for (uint32_t j = 0; j < params.nElementsY; j++) {
+    for (uint32_t i = 0; i < params.nElementsX; i++) {
+      sStagingPtr[j * params.nElementsX + i] = 0;
+    }
+  }
+  copyBuffers(staging.buffer, computeBuffers[1].buffer,
+              computeBuffers[1].aInfo.size);
+  copyBuffers(staging.buffer, computeBuffers[2].buffer,
+              computeBuffers[2].aInfo.size);
+  copyBuffers(staging.buffer, computeBuffers[3].buffer,
+              computeBuffers[3].aInfo.size);
+}
 
 uint32_t VulkanApp::getComputeQueueFamilyIndex() {
   auto queueFamilyProps = pDevice.getQueueFamilyProperties();

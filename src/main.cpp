@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
                                      cxxopts::value<std::string>())(
       "p,pew", "Solve with fixed coefficients but random initial conditions",
       cxxopts::value<std::string>())(
-      "a,aaa", "Solve with fixed initial conditions and x, but scan over e",
+      "a,avg", "Solve over grid and take average of Stokes parameters",
       cxxopts::value<std::string>());
   auto result = options.parse(argc, argv);
   if (result.count("c")) {
@@ -263,6 +263,84 @@ int main(int argc, char* argv[]) {
       }
       values.close();
     }
+  } else if (result.count("a")) {
+    toml::table tbl{};
+    auto infile = result["a"].as<std::string>();
+    std::cout << "Got here\n";
+    tbl = toml::parse_file(infile);
+    std::cout << "Got here\n";
+    auto sc = coupledConfig(*tbl["constants"].as_table());
+
+    VulkanApp app{sc};
+    std::cout << "Initialized GPE fine\n";
+    app.initBuffers();
+    std::cout << "Uploaded data\n";
+    auto start = std::chrono::high_resolution_clock::now();
+    app.savg();
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << std::format("Simulation ran for: {} ms\n", elapsed.count());
+    auto dir = std::format("data/{}", tstamp());
+    std::filesystem::create_directories(dir);
+    std::filesystem::copy(infile, dir,
+                          std::filesystem::copy_options::overwrite_existing);
+    std::ofstream values;
+    {
+      auto system = app.outputBuffer<cvec2>(0);
+      values.open(std::format("{}/psip.csv", dir));
+      for (uint32_t j = 0; j < app.params.nElementsY; ++j) {
+        for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
+          values << std::format(
+              " {}", numfmt(system[j * app.params.nElementsX + i].x));
+        }
+        values << '\n';
+      }
+      values.close();
+      values.open(std::format("{}/psim.csv", dir));
+      for (uint32_t j = 0; j < app.params.nElementsY; ++j) {
+        for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
+          values << std::format(
+              " {}", numfmt(system[j * app.params.nElementsX + i].y));
+        }
+        values << '\n';
+      }
+      values.close();
+    }
+    {
+      auto stokes = app.outputBuffer<float>(1);
+      values.open(std::format("{}/S3avg.csv", dir));
+      for (uint32_t j = 0; j < app.params.nElementsY; ++j) {
+        for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
+          values << std::format(" {}",
+                                numfmt(stokes[j * app.params.nElementsX + i]));
+        }
+        values << '\n';
+      }
+      values.close();
+      stokes = app.outputBuffer<float>(2);
+      values.open(std::format("{}/S2avg.csv", dir));
+      for (uint32_t j = 0; j < app.params.nElementsY; ++j) {
+        for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
+          values << std::format(" {}",
+                                numfmt(stokes[j * app.params.nElementsX + i]));
+        }
+        values << '\n';
+      }
+      values.close();
+      stokes = app.outputBuffer<float>(3);
+      values.open(std::format("{}/S1avg.csv", dir));
+      for (uint32_t j = 0; j < app.params.nElementsY; ++j) {
+        for (uint32_t i = 0; i < app.params.nElementsX; ++i) {
+          values << std::format(" {}",
+                                numfmt(stokes[j * app.params.nElementsX + i]));
+        }
+        values << '\n';
+      }
+      values.close();
+    }
+    return 0;
+
   } else {
     throw std::runtime_error("gib c\n");
   }

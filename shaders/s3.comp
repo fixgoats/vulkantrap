@@ -44,12 +44,12 @@ void main() {
   uint j = gl_GlobalInvocationID.y;
 
   vec4 tmp = data[j * NELEMENTSX + i];
-  float s1val = S1(tmp);
-  float s2val = S2(tmp);
-  float s3val = S3(tmp);
-  float norm = s1val * s1val + s2val * s2val + s3val * s3val;
+  float norm = dot(tmp, tmp);
+  float s1val = S1(tmp) / norm;
+  float s2val = S2(tmp) / norm;
+  float s3val = S3(tmp) / norm;
 
-  s3[j * NELEMENTSX + i] = s3val * s3val / norm;
-  s2[j * NELEMENTSX + i] = s2val * s2val / norm;
-  s1[j * NELEMENTSX + i] = s1val * s1val / norm;
+  s3[j * NELEMENTSX + i] += s3val / 150000.0;
+  s2[j * NELEMENTSX + i] += s2val / 150000.0;
+  s1[j * NELEMENTSX + i] += s1val / 150000.0;
 }
