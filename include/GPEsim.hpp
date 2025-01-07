@@ -3,49 +3,55 @@
 #include "vkhelpers.hpp"
 #include <bit>
 #include <cstdint>
-#include <random>
+#include <cstring>
+#include <string>
+#include <vector>
 
 using std::bit_cast;
 
+void appendOp(vk::CommandBuffer& b, Algorithm& a, u32 X, u32 Y = 1, u32 Z = 1);
+void appendOpNoBarrier(vk::CommandBuffer& b, Algorithm& a, u32 X, u32 Y = 1,
+                       u32 Z = 1);
 struct VulkanApp {
   vk::Instance instance;
-  vk::PhysicalDevice pDevice;
+  vk::PhysicalDevice physicalDevice;
   vk::Device device;
   vk::Queue queue;
   vk::Fence fence;
   VmaAllocator allocator;
-  MetaBuffer staging;
+  vk::Buffer staging;
+  VmaAllocation stagingAllocation;
+  VmaAllocationInfo stagingInfo;
   uint32_t cQFI;
-  SimConstants params;
-  std::vector<MetaBuffer> computeBuffers;
-  std::vector<vk::ShaderModule> modules;
-  vk::DescriptorSetLayout dSL;
-  vk::PipelineLayout pipelineLayout;
-  vk::PipelineCache pipelineCache;
-  std::vector<vk::Pipeline> computePipelines;
-  std::vector<vk::DescriptorSet> descriptorSets;
-  vk::DescriptorPool descriptorPool;
   vk::CommandPool commandPool;
 
-  std::random_device rd;
-
-  VulkanApp(SimConstants sc);
+  VulkanApp(size_t stagingSize);
   void copyBuffers(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
                    uint32_t bufferSize);
   void copyInBatches(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
                      uint32_t batchSize, uint32_t numBatches);
 
-  void runSim(uint32_t n);
-  void initSystem();
-  void s3();
-  void appendPipeline(vk::CommandBuffer& cB, uint32_t i);
-  void tests3();
-  void initBuffers();
+  vk::CommandBuffer beginRecord();
+  void execute(vk::CommandBuffer& b);
   uint32_t getComputeQueueFamilyIndex();
-  void setupPipelines(const std::vector<std::string>& moduleNames);
-  void rebuildPipelines(SimConstants p);
-  void writeAllToCsv(std::string conffile);
-
+  void writeToBuffer(MetaBuffer& buffer, const void* input, size_t size);
+  template <class T>
+  void writeToBuffer(MetaBuffer& buffer, const std::vector<T>& vec) {
+    writeToBuffer(buffer, vec.data(), vec.size() * sizeof(T));
+  };
+  void writeFromBuffer(MetaBuffer& buffer, void* output, size_t size);
+  template <class T>
+  void writeFromBuffer(MetaBuffer& buffer, std::vector<T> v) {
+    writeFromBuffer(buffer, v.data(), v.size() * sizeof(T));
+  }
+  template <class T>
+  void defaultInitBuffer(MetaBuffer& buffer, u32 nElements) {
+    T* TStagingPtr = bit_cast<T*>(stagingInfo.pMappedData);
+    for (u32 i = 0; i < nElements; i++) {
+      TStagingPtr[i] = {};
+    }
+    copyBuffers(staging, buffer.buffer, nElements * sizeof(T));
+  }
   template <typename T>
   MetaBuffer makeBuffer(uint32_t nElements) {
     vk::BufferCreateInfo bCI{vk::BufferCreateFlags(),
@@ -62,16 +68,9 @@ struct VulkanApp {
     allocCreateInfo.priority = 1.0f;
     return MetaBuffer{allocator, allocCreateInfo, bCI};
   }
-
-  template <typename T>
-  std::vector<T> outputBuffer(uint32_t n) {
-    T* sStagingPtr = bit_cast<T*>(staging.aInfo.pMappedData);
-    copyBuffers(computeBuffers[n].buffer, staging.buffer,
-                computeBuffers[n].aInfo.size);
-    std::vector<T> retVec(params.elementsTotal());
-    memcpy(retVec.data(), sStagingPtr, computeBuffers[n].aInfo.size);
-    return std::move(retVec);
-  }
-
+  Algorithm makeAlgorithm(std::string spirvname,
+                          std::vector<MetaBuffer*> buffers,
+                          const u8* specConsts = nullptr,
+                          const std::vector<u32>& specConstOffsets = {});
   ~VulkanApp();
 };

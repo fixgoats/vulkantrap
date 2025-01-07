@@ -28,15 +28,6 @@ std::vector<T> readFile(const std::string& filename) {
   return buffer;
 }
 
-template <class T>
-constexpr auto numfmt(T x) {
-  if constexpr (std::is_same_v<T, c32> or std::is_same_v<T, c64>) {
-    return std::format("({}+{}j)", x.real(), x.imag());
-  } else {
-    return std::format("{}", x);
-  }
-}
-
 std::string tstamp();
 
 void saveToFile(std::string fname, const char* buf, size_t size);
@@ -51,8 +42,8 @@ struct SimConstants {
   float pend;
   float rstart;
   float rend;
-  constexpr uint32_t X() const { return nElementsX / xGroupSize; }
-  constexpr uint32_t Y() const { return nElementsY / yGroupSize; }
+  constexpr u32 X() const { return nElementsX / xGroupSize; }
+  constexpr u32 Y() const { return nElementsY / yGroupSize; }
   constexpr bool validate() const {
     return (nElementsY % yGroupSize == 0) && (nElementsX % xGroupSize == 0);
   }
@@ -83,8 +74,45 @@ struct MetaBuffer {
   ~MetaBuffer();
 };
 
+struct Algorithm {
+  // Never owned
+  vk::Device* p_Device;
+  std::vector<MetaBuffer*> p_Buffer;
+  // Owned
+  vk::DescriptorSetLayout m_DSL;
+  vk::DescriptorPool m_DescriptorPool;
+  vk::DescriptorSet m_DescriptorSet;
+  vk::ShaderModule m_ShaderModule;
+  vk::PipelineLayout m_PipelineLayout;
+  vk::Pipeline m_Pipeline;
+  Algorithm(vk::Device* device, std::vector<MetaBuffer*> buffers,
+            const std::vector<u32>& spirv, const u8* specConsts = nullptr,
+            const std::vector<u32>& specConstOffsets = {});
+  ~Algorithm();
+};
+
+template <class T>
+void writeCsv(const std::string& filename, T* v, u32 nColumns, u32 nRows = 1,
+              const std::vector<std::string>& heading = {}) {
+  std::string out;
+  if (heading.size()) {
+    for (const auto& h : heading) {
+      out = std::format("{} {}", out, h);
+    }
+    out = std::format("{}\n", out);
+  }
+  for (u32 j = 0; j < nRows; j++) {
+    for (u32 i = 0; i < nColumns; i++) {
+      out = std::format("{} {}", out, v[j * nColumns + i]);
+    }
+    out = std::format("{}\n", out);
+  }
+  std::ofstream of(filename);
+  of << out;
+  of.close();
+}
+
 std::vector<uint32_t> readFile(const std::string& filename);
-vk::raii::Instance makeInstance(const vk::raii::Context& context);
 vk::PhysicalDevice pickPhysicalDevice(const vk::Instance& instance,
                                       const int32_t desiredGPU = -1);
 

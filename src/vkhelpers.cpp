@@ -1,3 +1,4 @@
+#include "typedefs.hpp"
 #include <cstddef>
 #include <format>
 #define VMA_IMPLEMENTATION
@@ -47,6 +48,78 @@ void MetaBuffer::allocate(VmaAllocator& allocator,
 
 MetaBuffer::~MetaBuffer() {
   vmaDestroyBuffer(*pallocator, static_cast<VkBuffer>(buffer), allocation);
+}
+
+Algorithm::Algorithm(vk::Device* device, std::vector<MetaBuffer*> buffers,
+                     const std::vector<u32>& spirv, const u8* specConsts,
+                     const std::vector<u32>& specConstOffsets) {
+  p_Device = device;
+  p_Buffer = buffers;
+  vk::ShaderModuleCreateInfo shaderMCI(vk::ShaderModuleCreateFlags(), spirv);
+  m_ShaderModule = device->createShaderModule(shaderMCI);
+  std::vector<vk::DescriptorSetLayoutBinding> dSLBs;
+  for (u32 i = 0; i < buffers.size(); i++) {
+    dSLBs.emplace_back(i, vk::DescriptorType::eStorageBuffer, 1,
+                       vk::ShaderStageFlagBits::eCompute);
+  }
+  vk::DescriptorSetLayoutCreateInfo dSLCI(vk::DescriptorSetLayoutCreateFlags(),
+                                          dSLBs);
+  m_DSL = device->createDescriptorSetLayout(dSLCI);
+  vk::PipelineLayoutCreateInfo pLCI(vk::PipelineLayoutCreateFlags(), m_DSL);
+  m_PipelineLayout = device->createPipelineLayout(pLCI);
+  std::vector<vk::SpecializationMapEntry> specEntries(specConstOffsets.size());
+  for (u32 i = 0; i < specEntries.size(); i++) {
+    specEntries[i].constantID = i;
+    specEntries[i].offset = i * 4;
+    specEntries[i].size = 4;
+  }
+  vk::SpecializationInfo specInfo;
+  specInfo.mapEntryCount = specEntries.size();
+  specInfo.pMapEntries = specEntries.data();
+  specInfo.dataSize = specConstOffsets.size() * 4;
+  specInfo.pData = specConsts;
+
+  vk::PipelineShaderStageCreateInfo cSCI(vk::PipelineShaderStageCreateFlags(),
+                                         vk::ShaderStageFlagBits::eCompute,
+                                         m_ShaderModule, "main", &specInfo);
+  vk::ComputePipelineCreateInfo cPCI(vk::PipelineCreateFlags(), cSCI,
+                                     m_PipelineLayout);
+  auto result = device->createComputePipeline({}, cPCI);
+  vk::detail::resultCheck(result.result, "Pipeline creation unsuccesful");
+  m_Pipeline = result.value;
+
+  // This is probably not the most efficient way to do this, but I'm not going
+  // to mess around with the descriptors after creation so the only overhead
+  // should be memory, and I'm not going to make thousands of these so
+  // it should be fine.
+  vk::DescriptorPoolSize dPS(vk::DescriptorType::eStorageBuffer, 1);
+  vk::DescriptorPoolCreateInfo dPCI(
+      vk::DescriptorPoolCreateFlags(
+          vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet),
+      1, dPS);
+  m_DescriptorPool = device->createDescriptorPool(dPCI);
+  vk::DescriptorSetAllocateInfo dSAI(m_DescriptorPool, 1, &m_DSL);
+  auto descriptorSets = device->allocateDescriptorSets(dSAI);
+  m_DescriptorSet = descriptorSets[0];
+  std::vector<vk::DescriptorBufferInfo> dBIs;
+  for (const auto& b : buffers) {
+    dBIs.emplace_back(b->buffer, 0, b->aInfo.size);
+  }
+  std::vector<vk::WriteDescriptorSet> writeDescriptorSets;
+  for (uint32_t i = 0; i < dBIs.size(); i++) {
+    writeDescriptorSets.emplace_back(m_DescriptorSet, i, 0, 1,
+                                     vk::DescriptorType::eStorageBuffer,
+                                     nullptr, &dBIs[i]);
+  }
+  device->updateDescriptorSets(writeDescriptorSets, {});
+}
+
+Algorithm::~Algorithm() {
+  p_Device->destroyDescriptorSetLayout(m_DSL);
+  p_Device->destroyDescriptorPool(m_DescriptorPool);
+  p_Device->destroyShaderModule(m_ShaderModule);
+  p_Device->destroyPipeline(m_Pipeline);
+  p_Device->destroyPipelineLayout(m_PipelineLayout);
 }
 
 vk::PhysicalDevice pickPhysicalDevice(const vk::Instance& instance,

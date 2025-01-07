@@ -1,39 +1,34 @@
 #include "GPEsim.hpp"
+#include "vkhelpers.hpp"
 #include <filesystem>
-#include <vulkan/vulkan.hpp>
 
 static const std::string appName{"Vulkan GPE Simulator"};
 
-VulkanApp::VulkanApp(SimConstants sc) : params{sc} {
+VulkanApp::VulkanApp(size_t stagingSize) {
   vk::ApplicationInfo appInfo{appName.c_str(), 1, nullptr, 0,
                               VK_API_VERSION_1_3};
-#ifndef DEBUG
-  const std::vector<const char*> layers;
-#else
   const std::vector<const char*> layers = {"VK_LAYER_KHRONOS_validation"};
-#endif // DEBUG
   vk::InstanceCreateInfo iCI(vk::InstanceCreateFlags(), &appInfo, layers, {});
   instance = vk::createInstance(iCI);
-  pDevice = pickPhysicalDevice(instance);
+  physicalDevice = pickPhysicalDevice(instance);
   cQFI = getComputeQueueFamilyIndex();
   float queuePriority = 1.0f;
   vk::DeviceQueueCreateInfo dQCI(vk::DeviceQueueCreateFlags(), cQFI, 1,
                                  &queuePriority);
   vk::DeviceCreateInfo dCI(vk::DeviceCreateFlags(), dQCI);
-  device = pDevice.createDevice(dCI);
+  device = physicalDevice.createDevice(dCI);
   vk::CommandPoolCreateInfo commandPoolCreateInfo(vk::CommandPoolCreateFlags(),
                                                   cQFI);
   commandPool = device.createCommandPool(commandPoolCreateInfo);
   queue = device.getQueue(cQFI, 0);
   fence = device.createFence(vk::FenceCreateInfo());
   VmaAllocatorCreateInfo allocatorInfo{};
-  allocatorInfo.physicalDevice = pDevice;
-  allocatorInfo.vulkanApiVersion = pDevice.getProperties().apiVersion;
+  allocatorInfo.physicalDevice = physicalDevice;
+  allocatorInfo.vulkanApiVersion = physicalDevice.getProperties().apiVersion;
   allocatorInfo.device = device;
   allocatorInfo.instance = instance;
   vmaCreateAllocator(&allocatorInfo, &allocator);
-  uint32_t nElements = params.nElementsX * params.nElementsY;
-  vk::BufferCreateInfo stagingBCI({}, 2 * nElements * sizeof(c32),
+  vk::BufferCreateInfo stagingBCI({}, stagingSize,
                                   vk::BufferUsageFlagBits::eTransferSrc |
                                       vk::BufferUsageFlagBits::eTransferDst);
   VmaAllocationCreateInfo allocCreateInfo{};
@@ -41,10 +36,9 @@ VulkanApp::VulkanApp(SimConstants sc) : params{sc} {
   allocCreateInfo.flags =
       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
       VMA_ALLOCATION_CREATE_MAPPED_BIT;
-  staging.allocate(allocator, allocCreateInfo, stagingBCI);
-  std::vector<std::string> moduleNames = {"rk4sim.spv", "simplermodel.spv",
-                                          "s3.spv"};
-  setupPipelines(moduleNames);
+  vmaCreateBuffer(allocator, bit_cast<VkBufferCreateInfo*>(&stagingBCI),
+                  &allocCreateInfo, bit_cast<VkBuffer*>(&staging),
+                  &stagingAllocation, &stagingInfo);
 }
 
 void VulkanApp::copyBuffers(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
@@ -62,12 +56,30 @@ void VulkanApp::copyBuffers(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   commandBuffer.end();
   vk::SubmitInfo submitInfo(nullptr, nullptr, commandBuffer);
   queue.submit(submitInfo, fence);
-  queue.waitIdle();
   auto result = device.waitForFences(fence, true, -1);
   vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
   vk::detail::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
+}
+
+void VulkanApp::writeToBuffer(MetaBuffer& buffer, const void* input,
+                              size_t size) {
+  memcpy(stagingInfo.pMappedData, input, size);
+  copyBuffers(staging, buffer.buffer, size);
+}
+
+void VulkanApp::writeFromBuffer(MetaBuffer& buffer, void* input, size_t size) {
+  copyBuffers(buffer.buffer, staging, size);
+  memcpy(stagingInfo.pMappedData, input, size);
+}
+
+Algorithm VulkanApp::makeAlgorithm(std::string spirvname,
+                                   std::vector<MetaBuffer*> buffers,
+                                   const u8* specConsts,
+                                   const std::vector<u32>& specConstOffsets) {
+  const auto spirv = readFile<u32>(spirvname);
+  return Algorithm(&device, buffers, spirv, specConsts, specConstOffsets);
 }
 
 void VulkanApp::copyInBatches(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
@@ -97,113 +109,48 @@ void VulkanApp::copyInBatches(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
-void VulkanApp::runSim(uint32_t n) {
+void VulkanApp::execute(vk::CommandBuffer& b) {
+  vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &b);
+  queue.submit(submitInfo, fence);
+  auto result = device.waitForFences(fence, vk::True, -1);
+  vk::detail::resultCheck(result, "waitForFences unsuccesful");
+  result = device.resetFences(1, &fence);
+  vk::detail::resultCheck(result, "resetFences unsuccesful");
+}
+
+vk::CommandBuffer VulkanApp::beginRecord() {
   auto commandBuffer =
       device
           .allocateCommandBuffers(
               {commandPool, vk::CommandBufferLevel::ePrimary, 1})
           .front();
   vk::CommandBufferBeginInfo cBBI(
-      vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+      vk::CommandBufferUsageFlagBits::eSimultaneousUse);
   commandBuffer.begin(cBBI);
 
-  for (uint32_t i = 0; i < params.times; i++) {
-    appendPipeline(commandBuffer, n);
-  }
-  commandBuffer.end();
-
-  vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &commandBuffer);
-  queue.submit(submitInfo, fence);
-  queue.waitIdle();
-  auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
-  result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
-  device.freeCommandBuffers(commandPool, commandBuffer);
+  return commandBuffer;
 }
 
-void VulkanApp::s3() {
-  auto commandBuffer =
-      device
-          .allocateCommandBuffers(
-              {commandPool, vk::CommandBufferLevel::ePrimary, 1})
-          .front();
-  vk::CommandBufferBeginInfo cBBI(
-      vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  commandBuffer.begin(cBBI);
-
-  appendPipeline(commandBuffer, 2);
-  commandBuffer.end();
-
-  vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &commandBuffer);
-  queue.submit(submitInfo, fence);
-  queue.waitIdle();
-  auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
-  result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
-  device.freeCommandBuffers(commandPool, commandBuffer);
+void appendOp(vk::CommandBuffer& b, Algorithm& a, u32 X, u32 Y, u32 Z) {
+  b.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
+                    vk::PipelineStageFlagBits::eAllCommands, {},
+                    fullMemoryBarrier, nullptr, nullptr);
+  b.bindPipeline(vk::PipelineBindPoint::eCompute, a.m_Pipeline);
+  b.bindDescriptorSets(vk::PipelineBindPoint::eCompute, a.m_PipelineLayout, 0,
+                       a.m_DescriptorSet, nullptr);
+  b.dispatch(X, Y, Z);
 }
 
-void VulkanApp::tests3() {
-  cvec2* sStagingPtr = bit_cast<cvec2*>(staging.aInfo.pMappedData);
-  for (uint32_t j = 0; j < params.nElementsY; j++) {
-    for (uint32_t i = 0; i < params.nElementsX; i++) {
-      sStagingPtr[j * params.nElementsX + i] = cvec2{{1, 0}, {0, 0}};
-    }
-  }
-  copyBuffers(staging.buffer, computeBuffers[0].buffer,
-              computeBuffers[0].aInfo.size);
-  auto commandBuffer =
-      device
-          .allocateCommandBuffers(
-              {commandPool, vk::CommandBufferLevel::ePrimary, 1})
-          .front();
-  vk::CommandBufferBeginInfo cBBI(
-      vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  commandBuffer.begin(cBBI);
-
-  appendPipeline(commandBuffer, 2);
-  commandBuffer.end();
-
-  vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &commandBuffer);
-  queue.submit(submitInfo, fence);
-  queue.waitIdle();
-  auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
-  result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
-  device.freeCommandBuffers(commandPool, commandBuffer);
+void appendOpNoBarrier(vk::CommandBuffer& b, Algorithm& a, u32 X, u32 Y,
+                       u32 Z) {
+  b.bindPipeline(vk::PipelineBindPoint::eCompute, a.m_Pipeline);
+  b.bindDescriptorSets(vk::PipelineBindPoint::eCompute, a.m_PipelineLayout, 0,
+                       a.m_DescriptorSet, nullptr);
+  b.dispatch(X, Y, Z);
 }
-
-void VulkanApp::initSystem() {
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<float> dis(-0.01, 0.01);
-  cvec2* sStagingPtr = bit_cast<cvec2*>(staging.aInfo.pMappedData);
-  for (uint32_t j = 0; j < params.nElementsY; j++) {
-    for (uint32_t i = 0; i < params.nElementsX; i++) {
-      sStagingPtr[j * params.nElementsX + i] =
-          cvec2{{dis(gen), dis(gen)}, {dis(gen), dis(gen)}};
-    }
-  }
-  copyBuffers(staging.buffer, computeBuffers[0].buffer,
-              computeBuffers[0].aInfo.size);
-}
-
-void VulkanApp::appendPipeline(vk::CommandBuffer& cB, uint32_t i) {
-  cB.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
-                     vk::PipelineStageFlagBits::eAllCommands, {},
-                     fullMemoryBarrier, nullptr, nullptr);
-  cB.bindPipeline(vk::PipelineBindPoint::eCompute, computePipelines[i]);
-  cB.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipelineLayout, 0,
-                        {descriptorSets[0]}, {});
-  cB.dispatch(params.X(), params.Y(), 1);
-}
-
-void VulkanApp::initBuffers() { initSystem(); }
 
 uint32_t VulkanApp::getComputeQueueFamilyIndex() {
-  auto queueFamilyProps = pDevice.getQueueFamilyProperties();
+  auto queueFamilyProps = physicalDevice.getQueueFamilyProperties();
   auto propIt =
       std::find_if(queueFamilyProps.begin(), queueFamilyProps.end(),
                    [](const vk::QueueFamilyProperties& prop) {
@@ -212,145 +159,12 @@ uint32_t VulkanApp::getComputeQueueFamilyIndex() {
   return std::distance(queueFamilyProps.begin(), propIt);
 }
 
-void VulkanApp::rebuildPipelines(SimConstants p) {
-  params = p;
-  vk::PipelineLayoutCreateInfo pLCI(vk::PipelineLayoutCreateFlags(), dSL);
-  pipelineLayout = device.createPipelineLayout(pLCI);
-  pipelineCache = device.createPipelineCache(vk::PipelineCacheCreateInfo());
-  std::vector<vk::SpecializationMapEntry> bleh(nSpecConsts);
-  for (uint32_t i = 0; i < nSpecConsts; i++) {
-    bleh[i].constantID = i;
-    bleh[i].offset = i * 4;
-    bleh[i].size = 4;
-  }
-  vk::SpecializationInfo specInfo;
-  specInfo.mapEntryCount = nSpecConsts;
-  specInfo.pMapEntries = bleh.data();
-  specInfo.dataSize = sizeof(SimConstants);
-  specInfo.pData = &params;
-
-  for (const auto& mod : modules) {
-    vk::PipelineShaderStageCreateInfo cSCI(vk::PipelineShaderStageCreateFlags(),
-                                           vk::ShaderStageFlagBits::eCompute,
-                                           mod, "main", &specInfo);
-    vk::ComputePipelineCreateInfo cPCI(vk::PipelineCreateFlags(), cSCI,
-                                       pipelineLayout);
-    auto result = device.createComputePipeline(pipelineCache, cPCI);
-    assert(result.result == vk::Result::eSuccess);
-    computePipelines.push_back(result.value);
-  }
-}
-
-void VulkanApp::setupPipelines(const std::vector<std::string>& moduleNames) {
-  for (const auto& name : moduleNames) {
-    std::vector<uint32_t> shaderCode = readFile<uint32_t>(name);
-    vk::ShaderModuleCreateInfo shaderMCI(vk::ShaderModuleCreateFlags(),
-                                         shaderCode);
-    modules.emplace_back(device.createShaderModule(shaderMCI));
-  }
-  std::vector<vk::DescriptorSetLayoutBinding> dSLBs;
-  for (uint32_t i = 0; i < computeBuffers.size(); i++) {
-    dSLBs.emplace_back(i, vk::DescriptorType::eStorageBuffer, 1,
-                       vk::ShaderStageFlagBits::eCompute);
-  }
-  vk::DescriptorSetLayoutCreateInfo dSLCI(vk::DescriptorSetLayoutCreateFlags(),
-                                          dSLBs);
-  dSL = device.createDescriptorSetLayout(dSLCI);
-  vk::PipelineLayoutCreateInfo pLCI(vk::PipelineLayoutCreateFlags(), dSL);
-  pipelineLayout = device.createPipelineLayout(pLCI);
-  pipelineCache = device.createPipelineCache(vk::PipelineCacheCreateInfo());
-  std::vector<vk::SpecializationMapEntry> bleh(nSpecConsts);
-  for (uint32_t i = 0; i < nSpecConsts; i++) {
-    bleh[i].constantID = i;
-    bleh[i].offset = i * 4;
-    bleh[i].size = 4;
-  }
-  vk::SpecializationInfo specInfo;
-  specInfo.mapEntryCount = nSpecConsts;
-  specInfo.pMapEntries = bleh.data();
-  specInfo.dataSize = sizeof(SimConstants);
-  specInfo.pData = &params;
-
-  for (const auto& mod : modules) {
-    vk::PipelineShaderStageCreateInfo cSCI(vk::PipelineShaderStageCreateFlags(),
-                                           vk::ShaderStageFlagBits::eCompute,
-                                           mod, "main", &specInfo);
-    vk::ComputePipelineCreateInfo cPCI(vk::PipelineCreateFlags(), cSCI,
-                                       pipelineLayout);
-    auto result = device.createComputePipeline(pipelineCache, cPCI);
-    assert(result.result == vk::Result::eSuccess);
-    computePipelines.push_back(result.value);
-  }
-
-  vk::DescriptorPoolSize dPS(vk::DescriptorType::eStorageBuffer, 1);
-  vk::DescriptorPoolCreateInfo dPCI(
-      vk::DescriptorPoolCreateFlags(
-          vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet),
-      1, dPS);
-  descriptorPool = device.createDescriptorPool(dPCI);
-  vk::DescriptorSetAllocateInfo dSAI(descriptorPool, 1, &dSL);
-  descriptorSets = device.allocateDescriptorSets(dSAI);
-  auto descriptorSet = descriptorSets[0];
-  std::vector<vk::DescriptorBufferInfo> dBIs;
-  for (const auto& b : computeBuffers) {
-    dBIs.emplace_back(b.buffer, 0, b.aInfo.size);
-  }
-  std::vector<vk::WriteDescriptorSet> writeDescriptorSets;
-  writeDescriptorSets.emplace_back(descriptorSet, 0, 0, 1,
-                                   vk::DescriptorType::eStorageBuffer, nullptr,
-                                   &dBIs[0]);
-  for (uint32_t i = 1; i < dBIs.size(); i++) {
-    writeDescriptorSets.emplace_back(descriptorSet, i, 0, 1,
-                                     vk::DescriptorType::eStorageBuffer,
-                                     nullptr, &dBIs[i]);
-  }
-  device.updateDescriptorSets(writeDescriptorSets, {});
-}
-
 VulkanApp::~VulkanApp() {
   device.waitIdle();
   device.destroyFence(fence);
-  for (auto& p : computePipelines) {
-    device.destroyPipeline(p);
-  }
-  device.destroyPipelineCache(pipelineCache);
-  device.destroyDescriptorPool(descriptorPool);
-  for (auto& m : modules) {
-    device.destroyShaderModule(m);
-  }
-  device.destroyPipelineLayout(pipelineLayout);
-  device.destroyDescriptorSetLayout(dSL);
-  staging.~MetaBuffer();
+  vmaDestroyBuffer(allocator, staging, stagingAllocation);
   vmaDestroyAllocator(allocator);
   device.destroyCommandPool(commandPool);
   device.destroy();
   instance.destroy();
-}
-
-void VulkanApp::writeAllToCsv(std::string conffile) {
-  auto Es = outputBuffer<uint32_t>(3);
-  std::transform(Es.begin(), Es.end(), Es.begin(), [&](uint32_t x) {
-    return static_cast<uint8_t>(fftshiftidx(x, 256));
-  });
-  auto system = outputBuffer<cvec2>(0);
-  std::ofstream values;
-  auto dir = std::format("data/{}", tstamp());
-  std::filesystem::create_directories(dir);
-  std::filesystem::copy(conffile, dir);
-  values.open(std::format("{}/psip.csv", dir));
-  for (uint32_t j = 0; j < params.nElementsY; ++j) {
-    for (uint32_t i = 0; i < params.nElementsX; ++i) {
-      values << std::format(" {}", numfmt(system[j * params.nElementsX + i].x));
-    }
-    values << '\n';
-  }
-  values.close();
-  values.open(std::format("{}/psim.csv", dir));
-  for (uint32_t j = 0; j < params.nElementsY; ++j) {
-    for (uint32_t i = 0; i < params.nElementsX; ++i) {
-      values << std::format(" {}", numfmt(system[j * params.nElementsX + i].y));
-    }
-    values << '\n';
-  }
-  values.close();
 }

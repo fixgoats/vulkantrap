@@ -19,16 +19,16 @@ layout(std430, set = 0, binding = 0) buffer system {
   vec4 data[NELEMENTSX * NELEMENTSY];
 };
 
-layout(std430, set = 0, binding = 1) buffer stokes3 {
-  float s3[NELEMENTSX * NELEMENTSY];
+layout(std430, set = 0, binding = 1) buffer stokes1 {
+  float s1[NELEMENTSX * NELEMENTSY];
 };
 
 layout(std430, set = 0, binding = 2) buffer stokes2 {
   float s2[NELEMENTSX * NELEMENTSY];
 };
 
-layout(std430, set = 0, binding = 3) buffer stokes1 {
-  float s1[NELEMENTSX * NELEMENTSY];
+layout(std430, set = 0, binding = 3) buffer stokes3 {
+  float s3[NELEMENTSX * NELEMENTSY];
 };
 
 float S3(vec4 v) {
@@ -44,12 +44,8 @@ void main() {
   uint j = gl_GlobalInvocationID.y;
 
   vec4 tmp = data[j * NELEMENTSX + i];
-  float s1val = S1(tmp);
-  float s2val = S2(tmp);
-  float s3val = S3(tmp);
-  float norm = s1val * s1val + s2val * s2val + s3val * s3val;
-
-  s3[j * NELEMENTSX + i] = s3val * s3val / norm;
-  s2[j * NELEMENTSX + i] = s2val * s2val / norm;
-  s1[j * NELEMENTSX + i] = s1val * s1val / norm;
+  float norm = dot(tmp, tmp);
+  s1[j * NELEMENTSX + i] = S1(tmp) / norm;
+  s2[j * NELEMENTSX + i] = S2(tmp) / norm;
+  s3[j * NELEMENTSX + i] = S3(tmp) / norm;
 }
