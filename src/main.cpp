@@ -60,6 +60,11 @@ int main(int argc, char* argv[]) {
     float eStart = 0.0;
     float eEnd = 0.4;
   } specConsts;
+  struct DivSpecConsts {
+    u32 size = nElementsTotal;
+    u32 xgroup = 64;
+    f32 divisor = 100000.0;
+  } divSpecConsts;
   std::vector<u32> offsets{0, 0, 0, 0, 0, 0, 0, 0};
   Algorithm rk4 = myApp.makeAlgorithm("rk4sim.spv", {&System},
                                       bit_cast<u8*>(&specConsts), offsets);
@@ -69,14 +74,23 @@ int main(int argc, char* argv[]) {
   vk::CommandBuffer buffer = myApp.beginRecord();
   auto start = std::chrono::high_resolution_clock::now();
   // appendOpNoBarrier(buffer, rk4, 32, 32);
-  for (uint32_t i = 0; i < 1000; i++) {
+  for (uint32_t i = 0; i < 500; i++) {
     appendOp(buffer, rk4, 32, 32);
   }
   buffer.end();
   for (u32 i = 0; i < 200; i++) {
     myApp.execute(buffer);
   }
+  myApp.device.freeCommandBuffers(myApp.commandPool, buffer);
   myApp.writeFromBuffer(System, localSystem);
+  for (uint32_t i = 0; i < 500; i++) {
+    appendOp(buffer, rk4, 32, 32);
+    appendOp(buffer, bloch, 32, 32);
+  }
+  buffer.end();
+  for (u32 i = 0; i < 200; i++) {
+    myApp.execute(buffer);
+  }
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed =
       std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
