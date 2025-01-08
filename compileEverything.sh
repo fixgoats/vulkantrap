@@ -7,3 +7,4 @@ cmake --build build --parallel $(nproc)
 glslangValidator -V shaders/rk4sim.comp -o build/rk4sim.spv
 glslangValidator -V shaders/simplermodel.comp -o build/simplermodel.spv
 glslangValidator -V shaders/s3.comp -o build/s3.spv
+glslangValidator -V shaders/divinplacebyscalar.comp -o build/divinplacebyscalar.spv

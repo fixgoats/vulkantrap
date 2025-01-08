@@ -16,7 +16,7 @@ layout(constant_id = 5) const float xend = 100000.1;
 layout(constant_id = 6) const float estart = -1000.0;
 layout(constant_id = 7) const float eend = 1000.0;
 layout(local_size_x_id = 2, local_size_y_id = 3, local_size_z = 1) in;
-const float dt = 0.001;
+const float dt = 0.01;
 
 const vec2 I = vec2(0, 1);
 
@@ -38,9 +38,9 @@ vec2 cinv(vec2 v) { return vec2(conj(v) / dot(v, v)); }
 
 vec4 f(vec4 y, float x, float e) {
   vec4 factor = vec4(x - (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
-                     -0.01 * (dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
+                     -(dot(y.xy, y.xy) + 2 * dot(y.zw, y.zw)),
                      x - (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)),
-                     -0.01 * (dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)));
+                     -(dot(y.zw, y.zw) + 2 * dot(y.xy, y.xy)));
   return cmul(y, factor) + cmul(vec2(0, -e), y.zwxy);
 }
 

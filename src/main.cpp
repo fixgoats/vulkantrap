@@ -58,8 +58,9 @@ int main(int argc, char* argv[]) {
     float xStart = 0.0;
     float xEnd = 2.0;
     float eStart = 0.0;
-    float eEnd = 0.4;
-  } specConsts;
+    float eEnd = 1.0;
+  } rk4SpecConsts;
+  u32 blochSpecConsts[2] = {nElementsTotal, 64};
   struct DivSpecConsts {
     u32 size = nElementsTotal;
     u32 xgroup = 64;
@@ -67,10 +68,19 @@ int main(int argc, char* argv[]) {
   } divSpecConsts;
   std::vector<u32> offsets{0, 0, 0, 0, 0, 0, 0, 0};
   Algorithm rk4 = myApp.makeAlgorithm("rk4sim.spv", {&System},
-                                      bit_cast<u8*>(&specConsts), offsets);
+                                      bit_cast<u8*>(&rk4SpecConsts), offsets);
   Algorithm bloch =
       myApp.makeAlgorithm("s3.spv", {&System, &S1, &S2, &S3},
-                          bit_cast<u8*>(&specConsts), {0, 0, 0, 0});
+                          bit_cast<u8*>(&blochSpecConsts), {0, 0});
+  Algorithm divbyscalarinplaces1 =
+      myApp.makeAlgorithm("divinplacebyscalar.spv", {&S1},
+                          bit_cast<u8*>(&divSpecConsts), {0, 0, 0});
+  Algorithm divbyscalarinplaces2 =
+      myApp.makeAlgorithm("divinplacebyscalar.spv", {&S2},
+                          bit_cast<u8*>(&divSpecConsts), {0, 0, 0});
+  Algorithm divbyscalarinplaces3 =
+      myApp.makeAlgorithm("divinplacebyscalar.spv", {&S3},
+                          bit_cast<u8*>(&divSpecConsts), {0, 0, 0});
   vk::CommandBuffer buffer = myApp.beginRecord();
   auto start = std::chrono::high_resolution_clock::now();
   // appendOpNoBarrier(buffer, rk4, 32, 32);
@@ -82,7 +92,7 @@ int main(int argc, char* argv[]) {
     myApp.execute(buffer);
   }
   myApp.device.freeCommandBuffers(myApp.commandPool, buffer);
-  myApp.writeFromBuffer(System, localSystem);
+  buffer = myApp.beginRecord();
   for (uint32_t i = 0; i < 500; i++) {
     appendOp(buffer, rk4, 32, 32);
     appendOp(buffer, bloch, 32, 32);
@@ -91,10 +101,31 @@ int main(int argc, char* argv[]) {
   for (u32 i = 0; i < 200; i++) {
     myApp.execute(buffer);
   }
+  myApp.device.freeCommandBuffers(myApp.commandPool, buffer);
+  /*buffer = myApp.beginRecord();
+  appendOp(buffer, divbyscalarinplaces1, 1024);
+  appendOp(buffer, divbyscalarinplaces2, 1024);
+  appendOp(buffer, divbyscalarinplaces3, 1024);
+  buffer.end();
+  myApp.execute(buffer);
+  myApp.device.freeCommandBuffers(myApp.commandPool, buffer);*/
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed =
       std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
   std::cout << std::format("Simulation ran for {} ms\n", elapsed);
-  std::ofstream of("aeugh.csv");
+  myApp.writeFromBuffer(System, localSystem);
+  std::vector<f32> s1(nElementsTotal);
+  std::vector<f32> s2(nElementsTotal);
+  std::vector<f32> s3(nElementsTotal);
+  myApp.writeFromBuffer(S1, s1);
+  myApp.writeFromBuffer(S2, s2);
+  myApp.writeFromBuffer(S3, s3);
+  std::ofstream of("system.csv");
   writeCsv(of, (c32*)localSystem.data(), 2 * nElementsX, nElementsY);
+  of.open("S1.csv");
+  writeCsv(of, (f32*)s1.data(), nElementsX, nElementsY);
+  of.open("S2.csv");
+  writeCsv(of, (f32*)s2.data(), nElementsX, nElementsY);
+  of.open("S3.csv");
+  writeCsv(of, (f32*)s3.data(), nElementsX, nElementsY);
 }
