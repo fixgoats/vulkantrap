@@ -1,6 +1,7 @@
 
 #include "hack.hpp"
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -57,19 +58,22 @@ int main(int argc, char* argv[]) {
     float xStart = 0.0;
     float xEnd = 2.0;
     float eStart = 0.0;
-    float eEnd = 0.1;
+    float eEnd = 0.4;
   } specConsts;
   std::vector<u32> offsets{0, 0, 0, 0, 0, 0, 0, 0};
   Algorithm rk4 = myApp.makeAlgorithm("rk4sim.spv", {&System},
                                       bit_cast<u8*>(&specConsts), offsets);
+  Algorithm bloch =
+      myApp.makeAlgorithm("s3.spv", {&System, &S1, &S2, &S3},
+                          bit_cast<u8*>(&specConsts), {0, 0, 0, 0});
   vk::CommandBuffer buffer = myApp.beginRecord();
   auto start = std::chrono::high_resolution_clock::now();
   // appendOpNoBarrier(buffer, rk4, 32, 32);
-  for (uint32_t i = 0; i < 200; i++) {
+  for (uint32_t i = 0; i < 1000; i++) {
     appendOp(buffer, rk4, 32, 32);
   }
   buffer.end();
-  for (u32 i = 0; i < 1000; i++) {
+  for (u32 i = 0; i < 200; i++) {
     myApp.execute(buffer);
   }
   myApp.writeFromBuffer(System, localSystem);
@@ -77,4 +81,6 @@ int main(int argc, char* argv[]) {
   auto elapsed =
       std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
   std::cout << std::format("Simulation ran for {} ms\n", elapsed);
+  std::ofstream of("aeugh.csv");
+  writeCsv(of, (c32*)localSystem.data(), 2 * nElementsX, nElementsY);
 }

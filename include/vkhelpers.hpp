@@ -92,23 +92,21 @@ struct Algorithm {
 };
 
 template <class T>
-void writeCsv(const std::string& filename, T* v, u32 nColumns, u32 nRows = 1,
+void writeCsv(std::ofstream& of, T* v, u32 nColumns, u32 nRows = 1,
               const std::vector<std::string>& heading = {}) {
   std::string out;
   if (heading.size()) {
     for (const auto& h : heading) {
-      out = std::format("{} {}", out, h);
+      of << h << ' ';
     }
-    out = std::format("{}\n", out);
+    of << '\n';
   }
   for (u32 j = 0; j < nRows; j++) {
     for (u32 i = 0; i < nColumns; i++) {
-      out = std::format("{} {}", out, v[j * nColumns + i]);
+      of << numfmt(v[j * nColumns + i]) << ' ';
     }
-    out = std::format("{}\n", out);
+    of << '\n';
   }
-  std::ofstream of(filename);
-  of << out;
   of.close();
 }
 

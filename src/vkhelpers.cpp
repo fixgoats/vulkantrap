@@ -85,7 +85,6 @@ Algorithm::Algorithm(vk::Device* device, std::vector<MetaBuffer*> buffers,
   vk::ComputePipelineCreateInfo cPCI(vk::PipelineCreateFlags(), cSCI,
                                      m_PipelineLayout);
   auto result = device->createComputePipeline({}, cPCI);
-  vk::detail::resultCheck(result.result, "Pipeline creation unsuccesful");
   m_Pipeline = result.value;
 
   // This is probably not the most efficient way to do this, but I'm not going

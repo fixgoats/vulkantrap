@@ -11,12 +11,12 @@ layout(constant_id = 0) const uint NELEMENTSX = 2; // spec constants set to
 layout(constant_id = 1) const uint NELEMENTSY = 2;
 layout(constant_id = 2) const uint XGROUPSIZE = 1;
 layout(constant_id = 3) const uint YGROUPSIZE = 1;
-layout(local_size_x_id = 2, local_size_y_id = 3, local_size_z = 1) in;
 layout(constant_id = 4) const float xstart = 100000.;
 layout(constant_id = 5) const float xend = 100000.1;
 layout(constant_id = 6) const float estart = -1000.0;
 layout(constant_id = 7) const float eend = 1000.0;
-const float dt = 0.01;
+layout(local_size_x_id = 2, local_size_y_id = 3, local_size_z = 1) in;
+const float dt = 0.001;
 
 const vec2 I = vec2(0, 1);
 

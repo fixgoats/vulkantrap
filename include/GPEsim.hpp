@@ -38,10 +38,10 @@ struct VulkanApp {
   template <class T>
   void writeToBuffer(MetaBuffer& buffer, const std::vector<T>& vec) {
     writeToBuffer(buffer, vec.data(), vec.size() * sizeof(T));
-  };
+  }
   void writeFromBuffer(MetaBuffer& buffer, void* output, size_t size);
   template <class T>
-  void writeFromBuffer(MetaBuffer& buffer, std::vector<T> v) {
+  void writeFromBuffer(MetaBuffer& buffer, std::vector<T>& v) {
     writeFromBuffer(buffer, v.data(), v.size() * sizeof(T));
   }
   template <class T>

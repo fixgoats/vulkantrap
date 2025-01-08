@@ -57,9 +57,7 @@ void VulkanApp::copyBuffers(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   vk::SubmitInfo submitInfo(nullptr, nullptr, commandBuffer);
   queue.submit(submitInfo, fence);
   auto result = device.waitForFences(fence, true, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -71,7 +69,7 @@ void VulkanApp::writeToBuffer(MetaBuffer& buffer, const void* input,
 
 void VulkanApp::writeFromBuffer(MetaBuffer& buffer, void* input, size_t size) {
   copyBuffers(buffer.buffer, staging, size);
-  memcpy(stagingInfo.pMappedData, input, size);
+  memcpy(input, stagingInfo.pMappedData, size);
 }
 
 Algorithm VulkanApp::makeAlgorithm(std::string spirvname,
@@ -103,9 +101,7 @@ void VulkanApp::copyInBatches(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer,
   vk::SubmitInfo submitInfo(nullptr, nullptr, commandBuffer);
   queue.submit(submitInfo, fence);
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
   device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
@@ -113,9 +109,7 @@ void VulkanApp::execute(vk::CommandBuffer& b) {
   vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &b);
   queue.submit(submitInfo, fence);
   auto result = device.waitForFences(fence, vk::True, -1);
-  vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
-  vk::detail::resultCheck(result, "resetFences unsuccesful");
 }
 
 vk::CommandBuffer VulkanApp::beginRecord() {
