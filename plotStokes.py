@@ -3,19 +3,34 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+from pathlib import Path
 
 parser = ArgumentParser()
+parser.add_argument("-d", "--directory", help="directory where data files are stored.")
 parser.add_argument(
-    "-f", "--format", help="The format to ouput with specified by file ending."
+    "-f",
+    "--format",
+    help="The format to ouput with specified by file ending.",
+    default="pdf",
 )
 args = parser.parse_args()
 
+parts = args.directory.split("/")
+graphdir = os.path.join("graphs", parts[-3], parts[-2])
+Path(graphdir).mkdir(parents=True, exist_ok=True)
 
-s3 = np.loadtxt("build/data/25-1-7/11-56/S3avg.csv")
-s2 = np.loadtxt("build/data/25-1-7/11-56/S2avg.csv")
-s1 = np.loadtxt("build/data/25-1-7/11-56/S1avg.csv")
-with open("build/data/24-12-16/18-57/simconf.toml", "rb") as f:
+
+a = np.loadtxt(os.path.join(args.directory, "psip.csv"), dtype=complex)
+b = np.loadtxt(os.path.join(args.directory, "psim.csv"), dtype=complex)
+with open(os.path.join(args.directory, "simconf.toml"), "rb") as f:
     conf = tomllib.load(f)["constants"]
+
+z = np.dstack((a, b))
+
+s3 = np.loadtxt(os.path.join(args.directory, "S3avg.csv"))
+s2 = np.loadtxt(os.path.join(args.directory, "S2avg.csv"))
+s1 = np.loadtxt(os.path.join(args.directory, "S1avg.csv"))
 
 fig, ax = plt.subplots()
 im = ax.imshow(
@@ -29,6 +44,9 @@ ax.set_xlabel("p")
 ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
 fig.savefig(f"S3.{args.format}")
+ax.clear()
+fig.clear()
+
 fig, ax = plt.subplots()
 im = ax.imshow(
     s2,
@@ -41,6 +59,9 @@ ax.set_xlabel("p")
 ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
 fig.savefig(f"S2.{args.format}")
+ax.clear()
+fig.clear()
+
 fig, ax = plt.subplots()
 im = ax.imshow(
     s1,
@@ -53,3 +74,5 @@ ax.set_xlabel("p")
 ax.set_ylabel(r"$\epsilon$")
 cb = plt.colorbar(im)
 fig.savefig(f"S1.{args.format}")
+ax.clear()
+fig.clear()

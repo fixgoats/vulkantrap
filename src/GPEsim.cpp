@@ -141,7 +141,11 @@ void VulkanApp::savg() {
   vk::detail::resultCheck(result, "waitForFences unsuccesful");
   result = device.resetFences(1, &fence);
   vk::detail::resultCheck(result, "resetFences unsuccesful");
-  commandBuffer.reset();
+  device.freeCommandBuffers(commandPool, commandBuffer);
+  commandBuffer = device
+                      .allocateCommandBuffers(
+                          {commandPool, vk::CommandBufferLevel::ePrimary, 1})
+                      .front();
   commandBuffer.begin(cBBI);
 
   for (uint32_t i = 0; i < params.times / 2; i++) {

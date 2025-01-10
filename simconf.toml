@@ -1,6 +1,6 @@
 [constants]
-nElementsX = 256
-nElementsY = 256
+nElementsX = 1024
+nElementsY = 1024
 times = 300000
 xGroupSize = 8
 yGroupSize = 8
