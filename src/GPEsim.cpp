@@ -118,8 +118,7 @@ vk::CommandBuffer VulkanApp::beginRecord() {
           .allocateCommandBuffers(
               {commandPool, vk::CommandBufferLevel::ePrimary, 1})
           .front();
-  vk::CommandBufferBeginInfo cBBI(
-      vk::CommandBufferUsageFlagBits::eSimultaneousUse);
+  vk::CommandBufferBeginInfo cBBI;
   commandBuffer.begin(cBBI);
 
   return commandBuffer;

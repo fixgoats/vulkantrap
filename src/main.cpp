@@ -83,7 +83,6 @@ int main(int argc, char* argv[]) {
                           bit_cast<u8*>(&divSpecConsts), {0, 0, 0});
   vk::CommandBuffer buffer = myApp.beginRecord();
   auto start = std::chrono::high_resolution_clock::now();
-  // appendOpNoBarrier(buffer, rk4, 32, 32);
   for (uint32_t i = 0; i < 500; i++) {
     appendOp(buffer, rk4, 32, 32);
   }
@@ -95,20 +94,20 @@ int main(int argc, char* argv[]) {
   buffer = myApp.beginRecord();
   for (uint32_t i = 0; i < 500; i++) {
     appendOp(buffer, rk4, 32, 32);
-    appendOp(buffer, bloch, 32, 32);
+    appendOp(buffer, bloch, 1024);
   }
   buffer.end();
   for (u32 i = 0; i < 200; i++) {
     myApp.execute(buffer);
   }
   myApp.device.freeCommandBuffers(myApp.commandPool, buffer);
-  /*buffer = myApp.beginRecord();
+  buffer = myApp.beginRecord();
   appendOp(buffer, divbyscalarinplaces1, 1024);
   appendOp(buffer, divbyscalarinplaces2, 1024);
   appendOp(buffer, divbyscalarinplaces3, 1024);
   buffer.end();
   myApp.execute(buffer);
-  myApp.device.freeCommandBuffers(myApp.commandPool, buffer);*/
+  myApp.device.freeCommandBuffers(myApp.commandPool, buffer);
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed =
       std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
